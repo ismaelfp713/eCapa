@@ -1,0 +1,277 @@
+﻿@page "/Admin/d7cross/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+    <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+            ×
+        </button>
+        @AlertMessage
+    </div>
+    <EditForm Model="@dsevenCross" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">D7 – Cross Reference and Documentation</h3>
+                <InputText @bind-Value="IdCar" readonly="true" class="form-control" placeholder="CAR Number" />
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText @bind-Value="dsevenCross.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                    <InputDate @bind-Value="dsevenCross.Created" hidden class="form-control" placeholder="Date Created" />
+                    <div class="form-group col-sm-12 col-md-12">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>
+                                        Do documents need to be updated and released?
+                                    </th>
+                                    <th colspan="2" class="text-center">Yes/No?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        Where applicable, are all related documents updated and (re)released?
+                                        Number, name and revision of the document
+                                    </td>
+                                    <td class="text-center"><InputCheckbox @bind-Value="dsevenCross.UpdatesRequired" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.UpdatesRequired == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Core Tools</td>
+                                    <td class="text-center "><InputCheckbox @bind-Value="dsevenCross.CoreTools" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.CoreTools == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Procedures</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="dsevenCross.Procedures" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.Procedures == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Instructions</td>
+                                    <td class="text-center">  <InputCheckbox @bind-Value="dsevenCross.Instructions" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.Instructions == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Add to Internal Audit</td>
+                                    <td class="text-center">  <InputCheckbox @bind-Value="dsevenCross.InternalAudit" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.InternalAudit == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Others</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="dsevenCross.Others" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.Others == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Where applicable, are all related employees (re)trained or (re)instructed?</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="dsevenCross.EmployeesTrained" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.EmployeesTrained == false ? "No" : "Yes")</td>
+                                </tr>                              
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-12">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>
+                                        Search of similar non-conformities?
+                                    </th>
+                                    <th colspan="2" class="text-center">Yes/No?</th>
+                                </tr>
+                            </thead>
+                            <tbody>                               
+                                <tr>
+                                    <td>Could similar non conformities be generated in other processes or Management Systems?</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="dsevenCross.SimilarNonConformities" @onclick="@(()=> hide = !hide)" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.SimilarNonConformities == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr hidden="@hide">
+                                    <td colspan="3">
+                                        Where?
+                                        <InputTextArea required="@(!hide)" @bind-Value="dsevenCross.SmcDescription" rows="4" class="form-control" placeholder="Where please describe" />
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Did you perform non-conformity analysis and implementation of actions in process or systems with potential risk?</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="dsevenCross.NcAnalysis" @onclick="@(()=> hide2 = !hide2)" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(dsevenCross.NcAnalysis == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr hidden="@hide2">
+                                    <td colspan="3">
+                                        What Actions?
+                                        <InputTextArea required="@(!hide2)" @bind-Value="dsevenCross.ActionsTaken" rows="4" class="form-control" placeholder="What Actions please describe" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (General.Status != "Approved" && General.Status != "Closed")
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+@code {
+    public bool PictureDialogOpen { get; set; }
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    protected string FilePaths { get; set; }
+    QAD_QMSContext db = new QAD_QMSContext();
+    DsevenCross dsevenCross = new DsevenCross();
+    [Parameter]
+    public string IdCar { get; set; }
+    private int idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public string ProblemState { get; set; }
+    public string ProblemDesc { get; set; }
+    public bool hide { get; set; } = true;
+    public bool hide2 { get; set; } = true;
+    public bool hideFileUploadButton { get; set; } = true;
+    public bool hideButton { get; set; } = false;
+    public bool hideCancelButton { get; set; } = true;
+    public bool HideAlert { get; set; } = true;
+    GeneralInformation General = new GeneralInformation();
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        dsevenCross.LastModifiedBy = loggedInUser;
+        dsevenCross.GeneralInformationId = CarIdNumber;
+
+        if (dsevenCross.IdDseven == 0)
+        {
+            db.DsevenCross.Add(dsevenCross);
+            await db.SaveChangesAsync();
+        }
+        else
+        {
+            db.DsevenCross.Update(dsevenCross);
+            try
+            {
+                await db.SaveChangesAsync();
+                await js.InvokeAsync<Task>("alert", $"D7 saved correctly.");
+                NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+            }
+            catch (Exception)
+            {
+
+                AlertShow("danger", $"There was an error saving.");
+                return;
+            }
+
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        DsevenCross d7Exists = await db.DsevenCross.FirstOrDefaultAsync(x => x.GeneralInformationId == CarIdNumber && x.IsDeleted == false);
+        if (d7Exists == null)
+        {
+            dsevenCross = new DsevenCross();
+            dsevenCross.Created = DateTime.Now;
+            var principal = HttpContextAccessor.HttpContext.User;
+            loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+            dsevenCross.CreatedBy = loggedInUser;
+
+        }
+        else
+        {
+            dsevenCross = d7Exists;
+            General = new GeneralInformation();
+            General = await GetGeneralInformation();
+            if(d7Exists.NcAnalysis == false)
+            {
+                hide = true;
+
+            }
+            else
+            {
+                hide = false;
+            }
+            if(d7Exists.SimilarNonConformities == false)
+            {
+                hide2 = true;
+            }
+            else
+            {
+                hide2 = false;
+            }
+        }
+
+    }
+
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    private async Task OnDialogClose()
+    {
+        await Task.Run(() => PictureDialogOpen = false);
+        StateHasChanged();
+    }
+    private void OpenDeleteDialog(int id)
+    {
+        idtopass = id;
+        PictureDialogOpen = true;
+        StateHasChanged();
+    }
+    private void ShowFileUploadButton()
+    {
+        if (hideFileUploadButton == true)
+        {
+            hideFileUploadButton = false;
+            hideButton = true;
+            hideCancelButton = !hideButton;
+        }
+        else
+        {
+            hideFileUploadButton = true;
+            hideButton = false;
+            hideCancelButton = !hideButton;
+
+        }
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+}

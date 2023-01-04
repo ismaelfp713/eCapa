@@ -1,0 +1,175 @@
+﻿@page "/Admin/CustomersList"
+
+@attribute [Authorize(Roles="Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h1 class="ml-2">Customers</h1>
+<div class="container-fluid">
+     <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+        @AlertMessage
+    </div>   
+    <EditForm Model="@customers"  OnValidSubmit="@SaveGeneralInformation" class="">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">New Customer</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText @bind-Value="customers.CreatedBy" hidden class="form-control" placeholder="Created By"/>
+                    <InputDate @bind-Value="customers.Created" hidden class="form-control" placeholder="Date Created"/>                                
+                </div>
+                 <div class="form-row">                             
+                    <div class="form-group col-sm-12 col-md-4">
+                        <InputText @bind-Value="customers.CustomerName" class="form-control" placeholder="Customer Name"/>
+                    </div>                    
+                </div>               
+            </div> 
+            <div class="card-footer">
+                <button type="submit" class="btn btn-success mr-2 btn-sm">Save</button>
+                <button type="button" class="btn btn-danger btn-sm" @onclick="@(() => Clear())">Cancel</button>
+            </div>
+        </div>
+    </EditForm>
+    <h3 class="mb-3 ">Customer List</h3>
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Customer Name</th>
+                  <AuthorizeView Roles="Admin, SuperAdmin">
+                    <th colspan="2">Actions</th>
+                  </AuthorizeView>
+            </tr>
+        </thead>
+        <tbody>
+           @if(CustomerList == null)
+            {
+                <tr>
+                    <td colspan="2">Loading...</td>
+                </tr>
+            }
+            else if(CustomerList.Count() == 0)
+            {
+                <tr>
+                    <td colspan="2">No customers registered!</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var c in CustomerList)
+                {
+                    <tr>
+                        <td>@c.CustomerName</td>
+                        <AuthorizeView Roles="Admin, SuperAdmin">
+                            <td>
+                                <button class="btn btn-primary btn-sm" @onclick="@(async () => await ToEdit(c.CustomersId))">Edit</button>
+                                <button class="btn btn-danger btn-sm" @onclick="@(async () => await MarkAsDeleted(c.CustomersId))">Delete</button>
+                            </td>
+                        </AuthorizeView>
+                    </tr>    
+                }
+            }
+           
+        </tbody>
+    </table>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    Customers customers = new Customers();
+    private string loggedInUser = string.Empty;
+    private IEnumerable<Customers> CustomerList { get; set; }
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+
+    private async Task SaveGeneralInformation()
+    {
+        try
+        {
+            customers.LastModifiedBy = loggedInUser;
+            if(customers.CustomersId == 0)
+            {
+                db.Customers.Add(customers);
+            }
+            else
+            {
+                customers.LastModifiedBy = loggedInUser;
+                customers.LastModifiedOn = DateTime.Now;
+                db.Customers.Update(customers);
+            }
+            await db.SaveChangesAsync();
+            AlertShow("success","Customer Saved!");
+            CustomerList = await GetCustomersList();
+            customers = new Customers();
+            setUser();
+        }
+        catch(Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+
+    }
+    protected void Clear()
+    {
+        customers = new Customers();
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        setUser();
+        CustomerList = await GetCustomersList();
+    }
+    private void setUser()
+    {
+        customers.Created = DateTime.Now;
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        customers.CreatedBy = loggedInUser;
+    }
+    private async Task<IEnumerable<Customers>> GetCustomersList()
+    {
+        return await db.Customers.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var customer = await db.Customers.FirstOrDefaultAsync(x => x.CustomersId == id);
+            customer.DeletedBy = loggedInUser;
+            customer.DeletedOn = DateTime.Now;
+            customer.LastModifiedBy = loggedInUser;
+            customer.LastModifiedOn = DateTime.Now;
+            customer.IsDeleted = true;
+            db.Customers.Update(customer);
+            await db.SaveChangesAsync();
+            AlertShow("success","Customer deleted!");
+            CustomerList = await GetCustomersList();
+            customers = new Customers();
+            setUser();
+        }
+
+    }
+    protected async Task ToEdit(int id)
+    {
+        customers = await db.Customers.FirstOrDefaultAsync(x => x.CustomersId == id);
+    }
+}

@@ -1,0 +1,220 @@
+﻿@page "/Admin/MapClause/{ProcessId}"
+
+@attribute [Authorize(Roles="Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h1 class="ml-2">Map Clause to Process</h1>
+<div class="container-fluid">
+     <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+      @AlertMessage
+    </div>
+    <EditForm Model="@processClauses" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">Process: @process.ProcessName</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">                   
+                    <div class="form-group col-sm-12 col-md-4">
+                        <InputSelect @bind-Value="@ClauseId" required class="form-control">
+                            <option selected value="">Select Applicable Clause</option>
+                            @if (GetList != null)
+                            {
+                                @foreach (var clause in GetList)
+                                {
+                                    <option value="@clause.ClauseId.ToString()">@clause.ClauseNumber @clause.ClauseName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-success mr-2 btn-sm">Save</button>
+                <button type="button" class="btn btn-danger btn-sm" @onclick="@(() => Clear())">Cancel</button>
+            </div>
+            </div>
+            </EditForm>
+            <h3 class="mb-3 ">Clause Assigned</h3>
+            <table class="table table-striped table-bordered">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Clause</th>
+                        <AuthorizeView Roles="Admin, SuperAdmin">
+                            <th colspan="2">Actions</th>
+                        </AuthorizeView>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (GetList == null)
+                    {
+                        <tr>
+                            <td colspan="2">Loading...</td>
+                        </tr>
+                    }
+                    else if (GetList.Count() == 0)
+                    {
+                        <tr>
+                            <td colspan="2">No clauses assigned!</td>
+                        </tr>
+                    }
+                    else
+                    {
+
+                        @if (GetClausesList == null)
+                        {
+                            <tr>
+                                <td colspan="2">Loading...</td>
+                            </tr>
+                        }
+                        else if (GetClausesList.Count() == 0)
+                        {
+                            <tr>
+                                <td colspan="2">No clauses assigned!</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var g in GetClausesList)
+                            {
+                                <tr>
+                                    <td>@g.ClauseNumber @g.ClauseName</td>
+                                    <AuthorizeView Roles="Admin, SuperAdmin">
+                                        <td>
+                                            <button class="btn btn-danger btn-sm" @onclick="@(async () => await ToDelete(g.ClauseId))">Delete</button>
+                                        </td>
+                                    </AuthorizeView>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+            </table>
+            </div>
+
+    @code {
+        QAD_QMSContext db = new QAD_QMSContext();
+        [Parameter]
+        public string ProcessId { get; set; }
+        public int PId { get; set; }
+        DClauses clause = new DClauses();
+        [Required]
+        public string ClauseId { get; set; }
+        DProcessClauses processClauses = new DProcessClauses();
+        public string loggedInUser = string.Empty;
+        DProcesses process = new DProcesses();
+        public IEnumerable<DClauses> GetList { get; set; }
+        public List<DClauses> GetClausesList { get; set; } = null;
+        public IEnumerable<DProcessClauses> GetAssignedClauses { get; set; }
+        public bool HideAlert { get; set; } = true;
+        public string AlertMessage { get; set; } = string.Empty;
+        public string AlertType { get; set; } = "danger";
+        private void resetalert()
+        {
+            AlertMessage = string.Empty;
+            AlertType = "danger";
+            HideAlert = true;
+        }
+        private void AlertShow(string type, string msg)
+        {
+            AlertMessage = msg;
+            AlertType = type;
+            HideAlert = false;
+        }
+        public async Task SaveGeneralInformation()
+        {
+            try
+            {
+                PId = Convert.ToInt32(ProcessId);
+                int cid = Convert.ToInt32(ClauseId);
+                if (processClauses.ClauseId == 0 && processClauses.ProcessId == 0)
+                {
+                    processClauses.ProcessId = PId;
+                    processClauses.ClauseId = cid;
+                    var exists = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ClauseId == cid && x.ProcessId == PId);
+                    if(exists == null)
+                    {
+                        db.DProcessClauses.Add(processClauses);
+                    }
+                    else
+                    {
+                        AlertShow("danger","Clause is already mapped to this process!");
+                        ClauseId = string.Empty;
+                        return;
+                    }
+
+                }
+                await db.SaveChangesAsync();
+                GetList = await GetListM();
+                GetAssignedClauses = await GetProcessClausesM(PId);
+                GetClausesList = await GetAssignedClausesM();
+                processClauses = new DProcessClauses();
+                ClauseId = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                ex.InnerException.ToString();
+                ex.Message.ToString();
+            }
+        }
+        protected void Clear()
+        {
+            processClauses = new DProcessClauses();
+        }
+        protected override async Task OnInitializedAsync()
+        {
+            PId = Convert.ToInt32(ProcessId);
+            process = await db.DProcesses
+            .FirstOrDefaultAsync(x => x.ProcessId == PId);
+
+            GetAssignedClauses = await GetProcessClausesM(PId);
+            GetClausesList = await GetAssignedClausesM();
+            GetList = await GetListM();
+        }
+        public async Task<IEnumerable<DClauses>> GetListM()
+        {
+            return await db.DClauses
+            .Where(x => x.IsDeleted == false)
+            .ToListAsync();
+        }
+        public async Task<IEnumerable<DProcessClauses>> GetProcessClausesM(int pid)
+        {
+            return await db.DProcessClauses
+            .Where(x => x.ProcessId == pid)
+            .ToListAsync();
+        }
+        protected async Task ToEdit(int id)
+        {
+            processClauses = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ClauseId == id);
+        }
+        public async Task<List<DClauses>> GetAssignedClausesM()
+        {
+            List<DClauses> cl = new List<DClauses>();
+            foreach (var clause in GetAssignedClauses)
+            {
+                var c = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == clause.ClauseId);
+                cl.Add(c);
+            }
+            return cl;
+        }
+        protected async Task ToDelete(int clauseId)
+        {
+            bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+            if (confirmed)
+            {
+                var clause = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ProcessId == PId && x.ClauseId == clauseId);
+                db.DProcessClauses.Remove(clause);
+                await db.SaveChangesAsync();
+                GetAssignedClauses = await GetProcessClausesM(PId);
+                GetClausesList = await GetAssignedClausesM();
+                GetList = await GetListM();
+                clause = new DProcessClauses();
+            }
+        }
+}

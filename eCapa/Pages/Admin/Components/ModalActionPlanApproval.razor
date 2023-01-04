@@ -1,0 +1,400 @@
+﻿@attribute [Authorize(Roles = "Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);"
+     aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">@Title</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <EditForm Model="@approval" class="">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                @if (approval != null && approval.DfiveActions.Count() > 0)
+                {
+                    <div class="modal-body"  style="overflow-y: auto; max-height: 600px;" >
+                        <div class="alert alert-primary" role="alert">
+                            Review the proposed action plan, the select either "Approve" or "Reject" to continue.
+                        </div>
+
+                        <p>@Text</p>
+                        <p class="ml-3"><strong>Quality Manager: @QaManager</strong></p>
+                        <span class="ml-3 badge bg-success text-white @QaBadge"> @approval.QaApprovalStatus</span>
+                        <div class="form-group col-md-12">
+                            <label><strong>Comments:</strong></label>
+                            @if (loggedInUser == approval.GeneralInformartion.QaManagerApprover && approval.QaApprovalStatus == "Pending Action Plan Approval")
+                            {
+                                <InputTextArea @bind-Value="approval.QaApproverComment" rows="4" class="form-control" placeholder="Please add comments regarding reason for approval/rejection." />
+                                <button type="button" class="btn btn-success mt-2" @onclick="@(async ()=> await QaManagerApproveActionPlan("Approved"))">Approve</button>
+                                <button type="button" class="btn btn-danger mt-2" @onclick="@(async ()=> await QaManagerApproveActionPlan("Rejected"))">Reject</button>
+                                <button type="button" class="btn btn-secondary mt-2" @onclick="@ModalCancel">Cancel</button>
+                            }
+                            else
+                            {
+                                <InputTextArea @bind-Value="approval.QaApproverComment" rows="4" disabled class="form-control" placeholder="Please add comments regarding reason for approval/rejection." />
+                                <button type="button" class="btn btn-success mt-2" disabled>Approve</button>
+                                <button type="button" class="btn btn-danger mt-2" disabled>Reject</button>
+                                <button type="button" class="btn btn-secondary mt-2" disabled>Cancel</button>
+                            }
+
+                        </div>
+                        <p class="ml-3"><strong>Functional Manager: @DeptManager</strong></p>
+                        <span class="ml-3 badge bg-success text-white @FunctionalBadge"> @approval.FunctionalApprovalStatus</span>
+                        <div class="form-group col-md-12">
+                            <label><strong>Comments:</strong></label>
+                            @if (loggedInUser == approval.GeneralInformartion.DepartmentApprover && approval.FunctionalApprovalStatus == "Pending Action Plan Approval")
+                            {
+                                <InputTextArea @bind-Value="approval.FunctionalApproverComment" rows="4" class="form-control" placeholder="Please add comments regarding reason for approval/rejection." />
+                                <button type="button" class="btn btn-success mt-2" @onclick="@(async ()=> await FunctionalApproveActionPlan("Approved"))">Approve</button>
+                                <button type="button" class="btn btn-danger mt-2" @onclick="@(async ()=> await FunctionalApproveActionPlan("Rejected"))">Reject</button>
+                                <button type="button" class="btn btn-secondary mt-2" @onclick="@ModalCancel">Cancel</button>
+                            }
+                            else
+                            {
+                                <InputTextArea @bind-Value="approval.FunctionalApproverComment" disabled rows="4" class="form-control" placeholder="Please add comments regarding reason for approval/rejection." />
+                                <button type="button" disabled class="btn btn-success mt-2">Approve</button>
+                                <button type="button" disabled class="btn btn-danger mt-2">Reject</button>
+                                <button type="button" disabled class="btn btn-secondary mt-2">Cancel</button>
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer align-content-center alert-@Alert">
+                        @Message
+                    </div>
+                }
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    DProcessRoles processRoles = new DProcessRoles();
+    Dfive approval { get; set; } = new Dfive();
+    SendEmailClass sendEmail = new SendEmailClass();
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Text { get; set; }
+    public string body { get; set; }
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+    [Parameter]
+    public string CapaId { get; set; }
+    public int Id { get; set; }
+    public int ActionPlanId { get; set; }
+    public string Message { get; set; }
+    public string loggedInUser { get; set; }
+    public string Owner { get; set; } = string.Empty;
+    public string QaManager { get; set; } = string.Empty;
+    public string DeptManager { get; set; } = string.Empty;
+    public string Alert { get; set; } = "default";
+    public string QaBadge { get; set; } = "bg-success";
+    public string FunctionalBadge { get; set; } = "bg-success";
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(CapaId))
+        {
+            Id = Convert.ToInt32(CapaId);
+            await Task.WhenAll(Task.Run(() => GetInitialData()));
+        }
+        else
+        {
+            Id = 0;
+        }
+        if (approval.QaApprovalStatus == "Approved")
+        {
+            QaBadge = "bg-success";
+        }
+        else
+        {
+            QaBadge = "bg-danger";
+        }
+        if (approval.FunctionalApprovalStatus == "Approved")
+        {
+            FunctionalBadge = "bg-success";
+        }
+        else
+        {
+            FunctionalBadge = "bg-danger";
+        }
+    }
+    protected async Task GetInitialData()
+    {
+        approval = await GetApprover(Id);
+        ActionPlanId = approval.IdActionPlan;
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+    }
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+    public async Task QaManagerApproveActionPlan(string action)
+    {
+        try
+        {
+            if (ActionPlanId == 0)
+            {
+                await js.InvokeAsync<Task>("alert", "Create an Action Plan first!");
+                Message = "Create an Action Plan first!";
+                Alert = "danger";
+                return;
+            }
+            else
+            {
+                var exists = await db.Dfive.FirstOrDefaultAsync(x => x.IdActionPlan == ActionPlanId && x.IsDeleted == false);
+                if (exists != null)
+                {
+                    approval.QaApprovedDate = DateTime.Now;
+                    switch (action)
+                    {
+
+                        case "Approved":
+                            approval.QaApprovalStatus = action;
+                            if (approval.FunctionalApprovalStatus == "Rejected")
+                            {
+                                await js.InvokeAsync<Task>("alert", "QA manager rejected this action, and cannot be approved until status is no longer rejected!");
+                                return;
+                            }
+                            if (approval.FunctionalApprovalStatus == "Approved")
+                            {
+                                foreach (var a in approval.DfiveActions)
+                                {
+                                    a.Status = "Open";
+                                    a.LastModifiedBy = loggedInUser;
+                                    a.LastModifiedOn = DateTime.Now;
+                                }
+                                approval.GeneralInformartion.Status = "Approved";
+                                sendEmail = new SendEmailClass
+                                  (
+                                      QaManager + ";" + DeptManager + ";",
+                                      Owner,
+                                      body,
+                                      $"{approval.GeneralInformartionId} approved"
+                                  );
+                                await sendEmail.SendEmailGeneric();
+                            }
+
+                            break;
+                        case "Rejected":
+                            approval.QaApprovalStatus = action;
+                            approval.QaApprovedDate = DateTime.Now;
+                            approval.FunctionalApproverComment = null;
+                            approval.FunctionalApprovalStatus = action;
+                            foreach (var a in approval.DfiveActions)
+                            {
+                                a.MarkedAsCompleted = null;
+                                a.Comment = null;
+                                a.Evidence = null;
+                                a.LastModifiedBy = loggedInUser;
+                                a.LastModifiedOn = DateTime.Now;
+                                a.Status = "Pending Action Plan Approval";
+                                a.EffectivenessVerifiedByOne = null;
+                                a.EffectivenessVerificationStatusOne = null;
+                                a.EffectivenessVerificationCommentOne = null;
+                                a.EffectivenessVerifiedOnOne = null;
+
+                                a.EffectivenessVerifiedByTwo = null;
+                                a.EffectivenessVerificationStatusTwo = null;
+                                a.EffectivenessVerificationCommentTwo = null;
+                                a.EffectivenessVerifiedOnTwo = null;
+
+                                a.EffectivenessVerifiedByTwo = null;
+                                a.EffectivenessVerificationStatusTwo = null;
+                                a.EffectivenessVerificationCommentTwo = null;
+                                a.EffectivenessVerifiedOnTwo = null;
+                                db.Update(a);
+                            }
+                            approval.GeneralInformartion.Status = "Rejected";
+                            sendEmail = new SendEmailClass
+                                (
+                                    QaManager + ";" + DeptManager + ";",
+                                    Owner,
+                                    body,
+                                    $"{approval.GeneralInformartionId} rejected"
+                                );
+                            await sendEmail.SendEmailGeneric();
+                            break;
+                    }
+
+                }
+            }
+            await db.SaveChangesAsync();
+            Message = $"Action Plan {action}!";
+            Alert = action == "Approved" ? "success" : "danger";
+            await ModalOk();
+            NavigationManager.NavigateTo($"/Admin/general/{approval.GeneralInformartionId.ToString()}",true);
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    public async Task FunctionalApproveActionPlan(string action)
+    {
+        try
+        {
+            if (ActionPlanId == 0)
+            {
+                await js.InvokeAsync<Task>("alert", "Create an Action Plan first!");
+                Message = "Create an Action Plan first!";
+                Alert = "danger";
+                await ModalOk();
+                return;
+            }
+            else
+            {
+                var exists = await db.Dfive.FirstOrDefaultAsync(x => x.IdActionPlan == ActionPlanId && x.IsDeleted == false);
+                if (exists != null)
+                {
+                    approval.FunctionalApprovedDate = DateTime.Now;
+                    switch (action)
+                    {
+                        case "Approved":
+                            if (approval.QaApprovalStatus == "Rejected")
+                            {
+                                await js.InvokeAsync<Task>("alert", "QA manager rejected this action, and cannot be approved until status is no longer rejected!");
+                                return;
+                            }
+                            if (approval.QaApprovalStatus == "Approved")
+                            {
+                                foreach (var a in approval.DfiveActions)
+                                {
+                                    a.Status = "Open";
+                                    a.LastModifiedBy = loggedInUser;
+                                    a.LastModifiedOn = DateTime.Now;
+                                }
+                                approval.GeneralInformartion.Status = "Approved";
+                            }
+                            approval.FunctionalApprovalStatus = action;
+                            sendEmail = new SendEmailClass
+                                  (
+                                      QaManager + ";" + DeptManager + ";",
+                                      Owner,
+                                      body,
+                                      $"{approval.GeneralInformartionId} approved"
+                                  );
+                            await sendEmail.SendEmailGeneric();
+                            break;
+                        case "Rejected":
+                            approval.FunctionalApprovalStatus = action;
+                            approval.QaApprovalStatus = "Rejected";
+                            foreach (var a in approval.DfiveActions)
+                            {
+                                a.MarkedAsCompleted = null;
+                                a.Comment = null;
+                                a.Evidence = null;
+                                a.LastModifiedBy = loggedInUser;
+                                a.LastModifiedOn = DateTime.Now;
+                                a.Status = "Pending Action Plan Approval";
+                                a.EffectivenessVerifiedByOne = null;
+                                a.EffectivenessVerificationStatusOne = null;
+                                a.EffectivenessVerificationCommentOne = null;
+                                a.EffectivenessVerifiedOnOne = null;
+
+                                a.EffectivenessVerifiedByTwo = null;
+                                a.EffectivenessVerificationStatusTwo = null;
+                                a.EffectivenessVerificationCommentTwo = null;
+                                a.EffectivenessVerifiedOnTwo = null;
+
+                                a.EffectivenessVerifiedByTwo = null;
+                                a.EffectivenessVerificationStatusTwo = null;
+                                a.EffectivenessVerificationCommentTwo = null;
+                                a.EffectivenessVerifiedOnTwo = null;
+                                db.Update(a);
+                            }
+                            approval.GeneralInformartion.Status = "Rejected";
+                            sendEmail = new SendEmailClass
+                             (
+                                 QaManager + ";" + DeptManager + ";",
+                                 Owner,
+                                 body,
+                                 $"CAPA{approval.GeneralInformartionId} rejected"
+                             );
+                            await sendEmail.SendEmailGeneric();
+                            break;
+                    }
+
+                }
+            }
+            await db.SaveChangesAsync();
+            Message = $"Action Plan {action}!";
+            Alert = action == "Approved" ? "success" : "danger";
+            await ModalOk();
+            NavigationManager.NavigateTo($"/Admin/general/{approval.GeneralInformartionId.ToString()}",true);
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected async Task<Dfive> GetApprover(int id)
+    {
+        var approver = await db.Dfive
+            .Include(x => x.DfiveActions)
+            .Include(x => x.GeneralInformartion)
+            .ThenInclude(x => x.Dthree)
+            .FirstOrDefaultAsync(x => x.IsDeleted == false && x.GeneralInformartionId == id);
+        var qaManager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approver.GeneralInformartion.QaManagerApprover);
+        QaManager = qaManager.NormalizedUserName;
+        var deptManager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approver.GeneralInformartion.DepartmentApprover);
+        DeptManager = deptManager.NormalizedUserName;
+        var owner = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approver.GeneralInformartion.Owner);
+        Owner = owner.NormalizedUserName;
+        return approver;
+    }
+    protected async Task<string> GetEmailBody(string action)
+    {
+        string tdStyle = "border: 1px solid #ddd; padding: 8px; margin:auto;";
+        string thStyle = "border: 1px solid #ddd; padding-top: 12px; padding-bottom: 12px; background-color: #800080; color:white;";
+
+        var g = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == approval.GeneralInformartionId);
+        var qamanager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approval.GeneralInformartion.QaManagerApprover);
+        var approver = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approval.GeneralInformartion.DepartmentApprover);
+        var verifier = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == approval.GeneralInformartion.Verifier);
+        var clause = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == approval.GeneralInformartion.Clause);
+        body += $"<strong>Expected Closure Date:  {approval.GeneralInformartion.ExpectedClosureDate.ToShortDateString()}</strong>";
+        body += $"<table border='1' style='border-collapse:collapse; width:100%; padding-top:12px;font-family: Arial, Helvetica, sans-serif;'>";
+        body += $"<thead>";
+        body += $"<tr>";
+        body += $"<th style='{thStyle}'>CAPA Number</th>";
+        body += $"<th style='{thStyle}'>CAPA Type</th>";
+        body += $"<th style='{thStyle}'>Source</th>";
+        body += $"<th style='{thStyle}'>Standard</th>";
+        body += $"<th style='{thStyle}'>Clause</th>";
+        body += $"<th style='{thStyle}'>Process</th>";
+        body += $"<th style='{thStyle}'>Severity</th>";
+        body += $"<th style='{thStyle}'>Symptom</th>";
+        body += $"<th style='{thStyle}'>Owner</th>";
+        body += $"<th style='{thStyle}'>Department Manager</th>";
+        body += $"</t>";
+        body += $"</thead>";
+        body += $"<tbody>";
+        body += $"<tr>";
+        body += $"<td style='{tdStyle}'>{ g.CapaNumber}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Type}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Source}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Standard}</td>";
+        body += $"<td style='{tdStyle}'>{ clause.ClauseNumber} {clause.ClauseName}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Process.ProcessName}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Severity}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Symptom}</td>";
+        body += $"<td style='{tdStyle}'>{ g.OwnerNavigation.NormalizedUserName.Substring(0, g.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"<td style='{tdStyle}'>{ approver.NormalizedUserName.Substring(0, approver.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"</tr>";
+        body += @"</tbody></table>";
+        body += $"<p>CAPA has been {action}, click the <a href='http://10.131.40.41:4401/Admin/general/{g.GeneralInformartionId}'>Link</a> to access the system.</p>";
+        return body;
+
+    }
+}

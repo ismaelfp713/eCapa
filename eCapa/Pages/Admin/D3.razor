@@ -1,0 +1,366 @@
+﻿@page "/Admin/d3/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+
+    <EditForm Model="@d3" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+            <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+                ×
+            </button>
+            @AlertMessage
+        </div>
+        <div class="alert alert-primary" role="alert">
+            Enter actions necessary to immediately contain the problem!
+        </div>
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">D3 – Containment Actions</h3>
+                <InputText @bind-Value="IdCar" readonly="true" class="form-control" placeholder="CAR Number" />
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText hidden @bind-Value="d3.CreatedBy" class="form-control" placeholder="Created By" />
+                    <InputText hidden @bind-Value="@d3.Status" class="form-control" placeholder="Status" />
+                    <InputDate hidden @bind-Value="d3.Created" class="form-control" placeholder="Date Created" />
+                    <div class="form-group col-sm-12 col-md-12">
+                        <InputTextArea @bind-Value="d3.Action" rows="4" class="form-control" placeholder="Describe the Action that needs to be implemented to solve the issue." />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <InputSelect @bind-Value="d3.Responsible" class="form-control">
+                            <option selected disabled value="">Select Owner</option>
+                            @if (GetResponsibles == null || GetResponsibles.Count() == 0)
+                            {
+                                <option value="">No Responsibles Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var p in GetResponsibles)
+                                {
+                                    <option value="@p.Id">@p.NormalizedUserName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <InputDate @bind-Value="@d3.DueDate" class="form-control" placeholder="Date Created" />
+                    </div>
+                    @if (GetActions != null)
+                    {
+                        @if (GetActions.Count() > 0)
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped table-sm small">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>Responsible</th>
+                                            <th>Status</th>
+                                            <th>Commitment Date</th>
+                                            <th class="text-center" colspan="3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+
+                                        @foreach (var a in GetActions)
+                                        {
+                                            <tr>
+                                                <td>@a.Action</td>
+                                                <td>@a.ResponsibleNavigation.NormalizedUserName</td>
+                                                <td>@a.Status</td>
+                                                <td>@a.DueDate.ToShortDateString()</td>
+                                                <td class="text-center">
+                                                    @if (a.Status == "Open")
+                                                    {
+                                                        <span @onclick="@(()=> OpenImplementContainmentDialog(a.IdDthree.ToString()))" class="oi oi-clipboard border-info text-info icon" aria-hidden="true"></span>
+                                                        <span @onclick="@(async ()=> await Alert(a))" class="oi oi-clock border-info text-danger icon ml-2" aria-hidden="true"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span @onclick="@(()=> OpenContainmentDialog(a.IdDthree.ToString()))" class="oi oi-eye border-info text-primary icon" aria-hidden="true"></span>
+                                                        <span class="oi oi-lock-locked border-info text-primary icon ml-2" aria-hidden="true"></span>
+                                                    }
+                                                    @if (a.Status == "Pending Verification" && a.GeneralInformartion.Verifier == loggedInUser)
+                                                    {
+                                                        <span @onclick="@(()=> OpenContainmentDialog(a.IdDthree.ToString()))" class="oi oi-dial border-info text-info icon ml-2" aria-hidden="true"></span>
+                                                    }
+
+                                                    @if (loggedInUser == a.GeneralInformartion.Owner)
+                                                    {
+                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                        {
+                                                            <span @onclick="@(async () => await MarkAsDeleted(a.IdDthree))" class="oi oi-trash border-info text-danger icon ml-2" aria-hidden="true"></span>
+                                                        }
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (General.Status == "Approved" || General.Status == "Closed")
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+@if (DeleteDialogOpen)
+{
+    <ModalDelayContainment Title="Delay Task"
+                           IdContainment="@idtopass"
+                           OnClose="@OnDeleteDialogClose">
+    </ModalDelayContainment>
+}
+@if (DialogImeplementContainment)
+{
+    <ModalImplementContainment Title="Implement Containment Task"
+                              IdContainment="@idtopass"
+                              OnClose="@OnDialogImplementContainmentClose">
+    </ModalImplementContainment>  
+}
+@if (DialogOpenContainment)
+{
+    <ModalContainmentValidate Title="Verification of Implementation:"
+                              IdContainment="@idtopass"
+                              OnClose="@OnDialogContainmentClose">
+    </ModalContainmentValidate>
+}
+@code {
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    public bool DialogOpenContainment { get; set; }
+    public bool DialogImeplementContainment { get; set; }
+    public bool DeleteDialogOpen { get; set; }
+    QAD_QMSContext db = new QAD_QMSContext();
+    Dthree d3 = new Dthree();
+    SendEmailClass sendEmail = new SendEmailClass();
+    GeneralInformation General = new GeneralInformation();
+    [Parameter]
+    public string IdCar { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public string Status { get; set; } = "Open";
+    public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+    public IEnumerable<Dthree> GetActions { get; set; }
+    public bool hide { get; set; } = true;
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    private string idtopass { get; set; }
+    public string AlertType { get; set; } = "danger";
+    public string body { get; set; }
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    protected async Task Alert(Dthree containment)
+    {
+        if (containment.DelayCount >= 3)
+        {
+            await js.InvokeAsync<Task>("alert", "Cannot delay this action, it has been delayed the 3 times permitted!");
+            return;
+        }
+        else
+        {
+            OpenDeleteDialog(containment.IdDthree.ToString());
+        }
+    }
+    public async Task SaveGeneralInformation()
+    {
+        bool isNew = false;
+        d3.LastModifiedBy = loggedInUser;
+        d3.GeneralInformartionId = CarIdNumber;
+        d3.Status = Status;
+        d3.EffectivenessVerificationDateOne = d3.DueDate.AddDays(5);
+        d3.EffectivenessVerificationDateTwo = d3.EffectivenessVerificationDateOne?.AddDays(30);
+        d3.EffectivenessVerificationDateThree = d3.EffectivenessVerificationDateTwo?.AddDays(30);
+        db.Dthree.Add(d3);
+        try
+        {
+            await db.SaveChangesAsync();
+            isNew = true;
+            if (isNew)
+            {
+                body = await Task.Run(() => GetEmailBody());
+                sendEmail = new SendEmailClass
+                    (
+                        d3.ResponsibleNavigation.Email,
+                        d3.GeneralInformartion.OwnerNavigation.Email,
+                        body,
+                        $"Containment action assigned for CAPA No: {IdCar}"
+                    );
+                var email = sendEmail.SendEmailGeneric();
+            }
+            GetActions = await Actions();
+            AlertShow("success", $"D3 saved correctly.");
+            d3 = new Dthree();
+            d3.Status = Status;
+            hide = false;
+            GetLoggedInUserAndCreateDate();
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        Status = "Open";
+        d3.Status = Status;
+        GetLoggedInUserAndCreateDate();
+        await GetInitialData();
+        if (GetActions.Count() > 0)
+        {
+            hide = false;
+        }
+        d3.DueDate = DateTime.Now;
+
+    }
+    protected async Task GetInitialData()
+    {
+        GetResponsibles = await Responsibles();
+        GetActions = await Actions();
+        General = new GeneralInformation();
+        General = await GetGeneralInformation();
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    public async Task<List<AspNetUsers>> Responsibles()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    public async Task<List<Dthree>> Actions()
+    {
+        return await db.Dthree.Include(x => x.GeneralInformartion).Where(x => x.GeneralInformartionId == CarIdNumber).ToListAsync();
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var action = await db.Dthree.FirstOrDefaultAsync(x => x.IdDthree == id);
+            db.Dthree.Remove(action);
+            var deleted = await db.SaveChangesAsync();
+            if (deleted > 0)
+            {
+                await js.InvokeAsync<Task>("alert", "Action deleted!");
+                NavigationManager.NavigateTo($"/Admin/D3/{CarIdNumber.ToString()}", true);
+            }
+        }
+    }
+    private void GetLoggedInUserAndCreateDate()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        d3.CreatedBy = loggedInUser;
+        d3.Created = DateTime.Now;
+        d3.DueDate = DateTime.Now;
+    }
+    private async Task OnDialogContainmentClose()
+    {
+        await Task.Run(() => DialogOpenContainment = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/D3/{CarIdNumber.ToString()}", true);
+    }
+    private async Task OnDialogImplementContainmentClose()
+    {
+        await Task.Run(() => DialogImeplementContainment = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/D3/{CarIdNumber.ToString()}", true);
+    }
+    private void OpenContainmentDialog(string id)
+    {
+        idtopass = id;        
+        DialogOpenContainment = true;
+        StateHasChanged();
+    }
+    private void OpenImplementContainmentDialog(string id)
+    {
+        idtopass = id;
+        DialogImeplementContainment = true;
+        StateHasChanged();
+    }
+    private async Task OnDeleteDialogClose()
+    {
+        await Task.Run(() => DeleteDialogOpen = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/D3/{CarIdNumber.ToString()}", true);
+    }
+    private void OpenDeleteDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpen = true;
+        StateHasChanged();
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+    protected string GetEmailBody()
+    {
+        string tdStyle = "border: 1px solid #ddd; padding: 8px; margin:auto;";
+        string thStyle = "border: 1px solid #ddd; padding-top: 12px; padding-bottom: 12px; background-color: #800080; color:white;";
+
+        body += $"<strong>Expected Closure Date:  {d3.DueDate.ToShortDateString()}</strong>";
+        body += $"<table border='1' style='border-collapse:collapse; width:100%; padding-top:12px;font-family: Arial, Helvetica, sans-serif;'>";
+        body += $"<thead>";
+        body += $"<tr>";
+        body += $"<th style='{thStyle}'>CAPA Number</th>";
+        body += $"<th style='{thStyle}'>Action</th>";
+        body += $"<th style='{thStyle}'>Assigned By</th>";
+        body += $"<th style='{thStyle}'>Status</th>";
+        body += $"</t>";
+        body += $"</thead>";
+        body += $"<tbody>";
+        body += $"<tr>";
+        body += $"<td style='{tdStyle}'>{ d3.GeneralInformartion.CapaNumber}</td>";
+        body += $"<td style='{tdStyle}'>{ d3.Action}</td>";
+        body += $"<td style='{tdStyle}'>{ d3.CreatedByNavigation.NormalizedUserName.Substring(0, d3.CreatedByNavigation.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"<td style='{tdStyle}'>{d3.Status}</td>";
+        body += $"</tr>";
+        body += @"</tbody></table>";
+        body += $"<p>CAPA Action requires you're attention, click the <a href='http://10.131.40.41:4401/Admin/general/{d3.GeneralInformartion.GeneralInformartionId}'>Link</a> to access the system.</p>";
+        return body;
+
+    }
+}

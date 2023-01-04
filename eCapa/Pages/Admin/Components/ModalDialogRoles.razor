@@ -1,0 +1,178 @@
+﻿@attribute [Authorize(Roles="Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);"
+     aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">@Title</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+              <EditForm Model="@userRoles" OnValidSubmit="@SaveGeneralInformation" class="">
+                  
+                    <DataAnnotationsValidator/>
+                    <ValidationSummary/>
+                <div class="modal-body">
+                <p>@Text</p>
+               
+                 <div class="form-group form-inline col-sm-12 col-md-12">
+                        <InputSelect @bind-Value="@userRoles.RoleId" required class="form-control">
+                            <option selected value="">Select Aplicable Roles</option>
+                            @if (GetAllRoles != null)
+                            {
+                                @foreach (var role in GetAllRoles)
+                                {
+                                    <option value="@role.Id">@role.Name</option>
+                                }
+                            }
+                        </InputSelect>
+                         <button type="button" class="btn btn-primary ml-2" @onclick="@SaveGeneralInformation">Save</button>
+                    </div>
+                <h3 class="mb-3 ">Roles Assigned</h3>
+                <table class="table table-striped table-bordered">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>Role</th>                           
+                            <th colspan="2">Actions</th>                                
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (userAssRoles == null)
+                        {
+                            <tr>
+                                <td colspan="2">Loading...</td>
+                            </tr>
+                        }
+                        else if (userAssRoles.Count() == 0)
+                        {
+                            <tr>
+                                <td colspan="2">No clauses assigned!</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var g in userAssRoles)
+                            {
+                                <tr>
+                                    <td>@g.Role.Name</td>                                   
+                                    <td>
+                                        <button class="btn btn-danger btn-sm" @onclick="@(async () => await MarkAsDeleted(g.RoleId))">Delete</button>  
+                                    </td>                                   
+                                </tr>
+                            }
+                      }
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer align-content-center alert-@Alert">
+               @Message
+            </div>
+            
+            </EditForm>
+           
+        </div>
+    </div>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    AspNetUserRoles userRoles = new AspNetUserRoles();
+    AspNetRoles roles = new AspNetRoles();
+    List<AspNetUserRoles> userAssRoles = new List<AspNetUserRoles>();
+    IEnumerable<AspNetRoles> GetAllRoles { get; set; }
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+    [Parameter]
+    public string UserId { get; set; }
+    public string Message { get; set; }
+    public string Alert { get; set; } = "default";
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        GetAllRoles = await AllRoles();
+        userAssRoles = await GetUserRoles(UserId);
+    }
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+    private async Task<List<AspNetRoles>> AllRoles()
+    {
+        return await db.AspNetRoles.ToListAsync();
+    }
+    private async Task<List<AspNetUserRoles>> GetUserRoles(string id)
+    {
+        return await db.AspNetUserRoles.Where(x => x.UserId == id).ToListAsync();
+    }
+
+    public async Task SaveGeneralInformation()
+    {
+        try
+        {
+            if(!string.IsNullOrEmpty(userRoles.RoleId))
+            {
+                var exists = await db.AspNetUserRoles.FirstOrDefaultAsync(x => x.RoleId == userRoles.RoleId && x.UserId == UserId);
+                userRoles.UserId = UserId;
+                if (exists == null)
+                {
+                    db.AspNetUserRoles.Add(userRoles);
+                }
+                else
+                {
+                    await js.InvokeAsync<Task>("alert", "Role is already mapped to this user!");
+                    userRoles = new AspNetUserRoles();
+                    Message = "User already has this role!";
+                    Alert = "danger";
+                    return;
+                }
+            }
+            else
+            {
+                await js.InvokeAsync<Task>("alert", "Select a Role to map to this user!");
+                userRoles = new AspNetUserRoles();
+                Message = "Select a role first!";
+                Alert = "danger";
+                return;
+            }
+            await db.SaveChangesAsync();
+            GetAllRoles = await AllRoles();
+            userAssRoles = await GetUserRoles(UserId);
+            userRoles = new AspNetUserRoles();
+            Message = "Role Assigned!";
+            Alert = "success";
+            await ModalOk();
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected async Task MarkAsDeleted(string id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var userRoles = await db.AspNetUserRoles.FirstOrDefaultAsync(x => x.RoleId == id && x.UserId == UserId);
+            db.AspNetUserRoles.Remove(userRoles);
+            await db.SaveChangesAsync();
+            userAssRoles = await GetUserRoles(UserId);
+            Message = "Role Deleted";
+            Alert = "danger";
+        }
+
+    }
+
+
+}

@@ -1,0 +1,222 @@
+﻿@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container">
+    <div class="modal fade show" id="myModal" style="display:block;background-color: rgba(10,10,10,.8);"
+         aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">@Title</h4>
+                    <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+                </div>
+                <EditForm Model="@d7" OnValidSubmit="@SaveGeneralInformation" class="">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+                    <div class="alert alert-primary" role="alert">
+                        Provide information on the work done for the task. Include any comment and documentation as evidence of work!
+                    </div>
+                    <div class="form-group card">
+                        <div class="card-header">
+                            <h3 class="mb-3 ">Task Information:</h3>
+                        </div>
+                        <div class="card-body" style="overflow-y: auto; max-height: 400px; ">
+                            <div class="form-row">
+                                @if (d7.IdSeven != 0)
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-sm small">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th>Task Owner</th>
+                                                    <th>Task Due Date</th>
+                                                    <th>Task Detail</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>@d7.OwnerNavigation.NormalizedUserName</td>
+                                                    <td>@d7.DueDate.ToShortDateString()</td>
+                                                    <td colspan="3">@d7.Action</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                <div class="form-group col-sm-12 col-md-12">
+                                    <label>Comment:</label>
+                                    <InputTextArea @bind-Value="d7.Comment" disabled="@OnlyView" rows="4" class="form-control" placeholder="Information on the work done for the task." />
+                                </div>
+                                <div class="form-group col-sm-12 col-md-12" hidden="@hideFileUploadButton">
+                                    <InputFile OnChange="HandleFileSelected" />
+                                </div>
+                                @if (!String.IsNullOrEmpty(d7.Evidence))
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-sm small">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th colspan="2">Evidence</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td colspan="2">
+                                                        <img class="img img-thumbnail" src="/Upload/@d7.GeneralInformartion.CapaNumber/@d7.Type.ToUpper()/@d7.IdSeven.ToString()/@d7.Evidence" />
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+
+                            </div>
+                        </div>
+                        <div class="card-footer" hidden="@hideFileUploadButton">
+                            <button type="submit" class="btn btn-primary bn-sm float-right">Mark as Complete</button>
+                        </div>
+                    </div>
+                </EditForm>
+
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+    IFileListEntry file;
+    public bool PictureDialogOpen { get; set; }
+    protected string FilePaths { get; set; }
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    Dseven d7 { get; set; } = new Dseven();
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Text { get; set; }
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+    [Parameter]
+    public string IdAction { get; set; }
+    public bool hideFileUploadButton { get; set; } = false;
+    public int IdActionNumber { get; set; }
+    public string CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+    public bool hide { get; set; } = true;
+    public bool OnlyView { get; set; } = false;
+    public async Task SaveGeneralInformation()
+    {
+        d7.LastModifiedBy = loggedInUser;
+        d7.LastModifiedOn = DateTime.Now;
+        d7.Status = "Pending Verification";
+        d7.MarkedAsCompleted = DateTime.Now;
+        db.Update(d7);
+        try
+        {
+            await db.SaveChangesAsync();
+            d7 = await Action();
+            await js.InvokeAsync<Task>("alert", $"Action saved correctly.");
+            await ModalOk();
+            GetLoggedInUser();
+
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(IdAction))
+        {
+            IdActionNumber = 0;
+        }
+        else
+        {
+            IdActionNumber = Convert.ToInt32(IdAction);
+        }
+        if (IdActionNumber != 0)
+        {
+            await GetInitialData();
+
+            if (d7 != null)
+            {
+                CarIdNumber = d7.GeneralInformartionId.ToString();
+                hide = false;
+            }
+        }
+        if (d7 != null)
+        {
+            string id = d7.GeneralInformartionId.ToString();
+            string path = "CAPA" + id + "/" + d7.Type.ToUpper() + "/" + IdAction;
+            if (d7.Evidence == null)
+            {
+                fileUpload.DeleteFileWhenNotSaved(path);
+            }
+        }
+        GetLoggedInUser();
+    }
+    protected async Task GetInitialData()
+    {
+        d7 = await Action();
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/implementation");
+    }
+    public async Task<Dseven> Action()
+    {
+        d7 = await db.Dseven.Include(x => x.OwnerNavigation).Include(x => x.GeneralInformartion).FirstOrDefaultAsync(x => x.IdSeven == IdActionNumber);
+        if (d7.Status != "Open")
+        {
+            OnlyView = true;
+            hideFileUploadButton = true;
+        }
+        return d7;
+    }
+    private void GetLoggedInUser()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+    }
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+    protected async Task HandleFileSelected(IFileListEntry[] files)
+    {
+        var isSaved = await db.Dseven.FirstOrDefaultAsync(x => x.IdSeven == d7.IdSeven);
+        if (isSaved == null)
+        {
+            await js.InvokeAsync<Task>("alert", "Task Must be saved before adding Images");
+            return;
+        }
+        foreach (var f in files)
+        {
+            d7.Evidence = f.Name;
+            string path = "CAPA" + d7.GeneralInformartionId.ToString() + "/" + d7.Type.ToUpper() + "/" + IdAction;
+            fileUpload.DeleteFileWhenNotSaved(path);
+            if (f != null)
+            {
+                string id = d7.GeneralInformartionId.ToString();
+                await fileUpload.UploadAsync(f, "CAPA" + id + "/" + d7.Type.ToUpper() + "/" + IdAction + "/");
+            }
+        }
+
+    }
+}

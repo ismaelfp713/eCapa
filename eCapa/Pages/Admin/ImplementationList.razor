@@ -1,0 +1,264 @@
+@page "/implementation"
+@attribute [Authorize]
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime js
+
+<AuthorizeView>
+    <div class="card">
+        <div class="card-body">
+            <h3>Immediate Containment Actions</h3>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-sm small">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-center">CAPA</th>
+                            <th>Action</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Type</th>
+                            <th class="text-center">Due Date</th>
+                            <th class="text-center">Delays Requested</th>
+                            <th>Created By</th>                          
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (ContainmentList != null)
+                        {
+                            if (ContainmentList.Count() == 0)
+                            {
+                                <tr><td colspan="9">No tasks pending</td></tr>
+                            }
+                            foreach (var c in ContainmentList)
+                            {
+                    <tr>
+                        <td class="text-center"><a href="#" @onclick="@(() => navigateCapa(c.GeneralInformartionId.ToString(), "d3"))">@c.GeneralInformartion.CapaNumber</a></td>
+                        <td>@c.Action</td>
+                        <td class="text-center">@c.Status</td>
+                        <td class="text-center">Containment</td>
+                        <td class="text-center">@c.DueDate.ToShortDateString()</td>
+                        <td class="text-center">@c.DelayCount</td>
+                        <td>@c.CreatedByNavigation.UserName</td>                      
+                    </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="card mt-2">
+        <div class="card-body">
+            <h3>Permanent Corrective Actions</h3>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-sm small">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-center">CAPA</th>
+                            <th class="text-center">Action</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Type</th>
+                            <th class="text-center">Due Date</th>
+                            <th class="text-center">Delays Requested</th>
+                            <th>Created By</th>                            
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (TaskList != null)
+                        {
+                            if (TaskList.Count() == 0)
+                            {
+                                <tr>
+                                    <td colspan="9">No tasks pending</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var a in TaskList)
+                                {
+                    <tr>
+                        <td class="text-center"><a href="#" @onclick="@(() => navigateCapa(a.GeneralInformartionId.ToString(), "implementation"))">@a.IdActionPlanNavigation.GeneralInformartion.CapaNumber</a></td>
+                        <td>@a.Action</td>
+                        <td class="text-center">@a.Status</td>
+                        <td class="text-center">@a.Type</td>
+                        <td class="text-center">@a.DueDate.ToShortDateString()</td>
+                        <td class="text-center">@a.DelayCount</td>
+                        <td>@a.IdActionPlanNavigation.GeneralInformartion.CreatedByNavigation.NormalizedUserName</td>                       
+                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    @if (DeleteDialogOpen)
+    {
+        <ModalDelayContainment Title="Delay Task"
+                               IdContainment="@idtopass"
+                               OnClose="@OnDeleteDialogClose">
+        </ModalDelayContainment>
+    }
+    @if (DeleteDialogOpenActions)
+    {
+        <ModalDelayActions Title="Delay Task"
+                           IdAction="@idtopass"
+                           OnClose="@OnDeleteDialogActionsClose">
+        </ModalDelayActions>
+    }
+
+    @if (DialogOpenContainment)
+    {
+        <ModalImplementContainment Title="Implement Task"
+                                   IdContainment="@idtopass"
+                                   OnClose="@OnDialogContainmentClose">
+        </ModalImplementContainment>
+    }
+    @if (DialogOpenAction)
+    {
+        <ModalImplementActions Title="Implement Task"
+                                   IdAction="@idtopass"
+                                   OnClose="@OnDialogActionClose">
+        </ModalImplementActions>
+    }
+</AuthorizeView>
+
+@code{
+    public bool DeleteDialogOpen { get; set; }
+    public bool DeleteDialogOpenActions { get; set; }
+    public bool DialogOpenContainment { get; set; }
+    public bool DialogOpenAction { get; set; }
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    public IEnumerable<DfiveActions> TaskList { get; set; }
+    public IEnumerable<Dthree> ContainmentList { get; set; }
+    private string idtopass{ get; set; }
+    public string loggedInUser { get; set; }
+    public int CapaId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        await Task.WhenAll(Task.Run(() => GetInitialData()));
+    }
+    protected async Task GetInitialData()
+    {
+        ContainmentList = new  List<Dthree>();
+        ContainmentList = await GetContainmentTasks();
+        TaskList = new List<DfiveActions>();
+        TaskList = await GetTasks();
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetTasks()
+    {
+        TaskList = await db.DfiveActions.Where(
+            x => x.Owner.Equals(loggedInUser) &&
+            x.IsDeleted.Equals(false) &&
+            x.Status != "Closed"
+            )
+            .Include(y => y.IdActionPlanNavigation.GeneralInformartion).Where(y => y.IsDeleted.Equals(false))
+            .Include(s => s.IdActionPlanNavigation.GeneralInformartion.CreatedByNavigation)
+            .ToListAsync();
+        return TaskList;
+    }
+    protected async Task<IEnumerable<Dthree>> GetContainmentTasks()
+    {
+        ContainmentList = await db.Dthree
+        .Where
+        (
+            x => x.Responsible == loggedInUser &&
+            x.IsDeleted.Equals(false) &&
+            x.Status != "Closed"
+        )
+        .Include(x => x.CreatedByNavigation)
+        .Include(x => x.GeneralInformartion)
+        .ToListAsync();
+        return ContainmentList;
+    }
+    protected void navigateCapa(string id, string action)
+    {
+        NavigationManager.NavigateTo($"/Admin/{action}/{id}");
+    }
+    protected void navigate(string d)
+    {
+        NavigationManager.NavigateTo($"/Admin/containment/{d}");
+    }
+    protected void navigateAction(string d)
+    {
+        NavigationManager.NavigateTo($"/Admin/action/{d}");
+    }
+    protected async Task Alert(Dthree containment)
+    {
+        if(containment.DelayCount >= 3)
+        {
+            await js.InvokeAsync<Task>("alert", "Cannot delay this action, it has been delayed the 3 times permitted!");
+            return;
+        }
+        else
+        {
+            OpenDeleteDialog(containment.IdDthree.ToString());
+        }
+    }
+    protected async Task AlertActions(DfiveActions actions)
+    {
+        if(actions.DelayCount >= 3)
+        {
+            await js.InvokeAsync<Task>("alert", "Cannot delay this action, it has been delayed the 3 times permitted!");
+            return;
+        }
+        else
+        {
+            OpenDeleteActionsDialog(actions.IdFive.ToString());
+        }
+    }
+    private async Task OnDeleteDialogClose()
+    {
+        await Task.Run(()=>DeleteDialogOpen = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/implementation",true);
+    }
+    private void OpenDeleteDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpen = true;
+        StateHasChanged();
+    }
+    private async Task OnDeleteDialogActionsClose()
+    {
+        await Task.Run(()=>DeleteDialogOpenActions = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/implementation",true);
+    }
+    private void OpenDeleteActionsDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpenActions = true;
+        StateHasChanged();
+    }
+    private async Task OnDialogContainmentClose()
+    {
+        await Task.Run(() => DialogOpenContainment = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/implementation", true);
+    }
+    private void OpenContainmentDialog(string id)
+    {
+        idtopass = id;
+        DialogOpenContainment = true;
+        StateHasChanged();
+    }
+    private async Task OnDialogActionClose()
+    {
+        await Task.Run(() => DialogOpenAction = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/implementation", true);
+    }
+    private void OpenActionDialog(string id)
+    {
+        idtopass = id;
+        DialogOpenAction = true;
+        StateHasChanged();
+    }
+
+}
+

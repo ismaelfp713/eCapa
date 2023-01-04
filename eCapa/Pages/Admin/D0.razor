@@ -1,0 +1,644 @@
+﻿@page "/Admin/d0"
+@page "/Admin/d0/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+
+<div class="container-fluid">
+    <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+            ×
+        </button>
+        @AlertMessage
+    </div>
+    <EditForm Model="@gen" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">General Information</h3>
+                <InputText @bind-Value="IdCar" readonly="true" class="form-control" placeholder="CAR Number" />
+            </div>
+            <div class="card-body">
+
+                <div class="form-row">
+                    <InputText @bind-Value="gen.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                    <InputText @bind-Value="gen.Status" hidden class="form-control" placeholder="Status" />
+                    <InputDate @bind-Value="gen.Created" hidden class="form-control" placeholder="Date Created" />
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>CAPA Type:</strong></label>
+                        <InputSelect @bind-Value="gen.Type" class="form-control">
+                            <option selected disabled value="">Select Type</option>
+                            @foreach (var type in Enum.GetValues(typeof(types)))
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>CAPA Source:</strong></label>
+                        <InputSelect @bind-Value="gen.Source" class="form-control">
+                            <option selected disabled value="">Select Type</option>
+                            @foreach (var source in Enum.GetValues(typeof(sources)))
+                            {
+
+                                <option value="@source">@source</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>CAPA Severity:</strong></label>
+                        <InputSelect @bind-Value="gen.Severity" class="form-control">
+                            <option selected disabled value="">Select Type</option>
+                            @if (gen.Source == sources.Internal_Audit.ToString())
+                            {
+                                <option value="@severity.Internal_Finding.ToString()">@severity.Internal_Finding.ToString()</option>
+                            }
+                            else
+                            {
+                                @foreach (var sev in Enum.GetValues(typeof(severity)))
+                                {
+
+                                    <option value="@sev">@sev</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Quality Manager Approver:</strong></label>
+                        <InputSelect @bind-Value="@gen.QaManagerApprover" class="form-control">
+                            <option selected disabled value="">Select QA Manager</option>
+                            @if (QaManagers == null || QaManagers.Count() == 0)
+                            {
+                                <option value="">No Managers Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var m in QaManagers)
+                                {
+                                    <option value="@m.Id">@m.NormalizedUserName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Department Manager Approver:</strong></label>
+                        <InputSelect @bind-Value="@gen.DepartmentApprover" class="form-control">
+                            <option selected disabled value="">Select Department Manager Approver</option>
+                            @if (DepartmentManagers == null || DepartmentManagers.Count() == 0)
+                            {
+                                <option value="">No Department Approvers Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var m in DepartmentManagers)
+                                {
+                                    <option value="@m.Id">@m.NormalizedUserName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Verification Approver:</strong></label>
+                        <InputSelect @bind-Value="@gen.Verifier" class="form-control">
+                            <option selected disabled value="">Select Verification Approver</option>
+                            @if (Verifiers == null || Verifiers.Count() == 0)
+                            {
+                                <option value="">No Verifiers Approvers Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var m in Verifiers)
+                                {
+                                    <option value="@m.Id">@m.NormalizedUserName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Customer:</strong></label>
+                        <InputSelect @bind-Value="@IdCustomer" class="form-control">
+                            <option selected disabled value="">Select Customer</option>
+                            @if (AllCustomers == null || AllCustomers.Count() == 0)
+                            {
+                                <option value="">No Customers Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var c in AllCustomers)
+                                {
+                                    <option value="@c.CustomersId.ToString()">@c.CustomerName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Department:</strong></label>
+                        <InputSelect Value="IdDepartment"
+                                     ValueChanged="@((string IdDepartment) =>DepartmentHasChanged(IdDepartment))"
+                                     ValueExpression="@( () => IdDepartment)"
+                                     class="form-control">
+                            <option selected disabled value="">Select Department</option>
+                            @if (AllDepartments == null || AllDepartments.Count() == 0)
+                            {
+                                <option value="">No Departments Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var d in AllDepartments)
+                                {
+                                    <option value="@d.DepartmentId.ToString()">@d.DepartmentName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Process:</strong></label>
+                        <InputSelect Value="IdProcess"
+                                     ValueChanged="@((string IdProcess) => ProcessHasChanged(IdProcess))"
+                                     ValueExpression="(() => IdProcess)"
+                                     class="form-control">
+                            <option selected disabled value="">Select Process</option>
+                            @if (ProcessesByDepartment == null || ProcessesByDepartment.Count() == 0)
+                            {
+                                <option value="">No Processes Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var p in ProcessesByDepartment)
+                                {
+                                    <option value="@p.ProcessId.ToString()">@p.ProcessName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Standard:</strong></label>
+                        <InputSelect @bind-Value="gen.Standard" class="form-control">
+                            <option selected disabled value="">Select Standard</option>
+                            @foreach (var standard in Enum.GetValues(typeof(standards)))
+                            {
+                                <option value="@standard">@standard</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Clause:</strong></label>
+                        <InputSelect Value="@IdClause"
+                                     ValueChanged="@((string IdClause) => ClauseHasChanged(IdClause))"
+                                     ValueExpression="(() => IdClause)"
+                                     class="form-control">
+                            <option selected disabled value="">Select Clause</option>
+                            @if (ClausesByProcess == null || ClausesByProcess.Count() == 0)
+                            {
+                                <option value="">No Clauses Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var c in ClausesByProcess)
+                                {
+                                    <option value="@c.ClauseId">@c.ClauseNumber - @c.ClauseName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>SubClause:</strong></label>
+                        <InputSelect @bind-Value="@IdSubClause" class="form-control">
+                            <option selected disabled value="">Select Sub Clause</option>
+                            @if (SubClausesByClause == null || SubClausesByClause.Count() == 0)
+                            {
+                                <option value="">No SubClausesByClause Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var sc in SubClausesByClause)
+                                {
+                                    <option value="@sc.SubClauseId">@sc.SubClauseNumber - @sc.SubClauseName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Audit Report Number:</strong></label>
+                        <InputText @bind-Value="gen.AuditReportNumber" class="form-control" placeholder="Audit Report Number" />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Expected Closure Date:</strong></label>
+                        <InputDate @bind-Value="@gen.ExpectedClosureDate" class="form-control" placeholder="Expected Closure Date" />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-4">
+                        <label><strong>Owner:</strong></label>
+                        <InputSelect @bind-Value="@gen.Owner" class="form-control">
+                            <option selected disabled value="">Select CAPA Owner</option>
+                            @if (Owners == null || Owners.Count() == 0)
+                            {
+                                <option value="">No Owners Found</option>
+                            }
+                            else
+                            {
+                                @foreach (var o in Owners)
+                                {
+                                    <option value="@o.Id">@o.NormalizedUserName</option>
+                                }
+                            }
+                        </InputSelect>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-sm-12 col-md-12">
+                        <label><strong>Symptom:</strong></label>
+                        <InputTextArea @bind-Value="gen.Symptom" rows="4" class="form-control" placeholder="Symptom – What is the observed deviation by the internal / external customer/certification/standard/others, and how was it found:" />
+                    </div>
+                </div>
+                <hr />
+                <h3>D1 - Building the Team</h3>
+                <hr />
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm small">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Team Role</th>
+                                <th>Name</th>
+                                <th>Phone Number</th>
+                                <th>Email Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (processAssRoles == null)
+                            {
+                                <tr>
+                                    <td colspan="7">Loading...</td>
+                                </tr>
+                            }
+                            else if (processAssRoles.Count() == 0)
+                            {
+                                <tr>
+                                    <td colspan="7">No team registered!</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var t in processAssRoles)
+                                {
+                                    <tr>
+                                        <td>@t.Role.RoleName</td>
+                                        <td>@t.User.NormalizedUserName.Substring(0, t.User.NormalizedUserName.IndexOf("@"))</td>
+                                        <td>@t.User.PhoneNumber</td>
+                                        <td>@t.User.NormalizedEmail</td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (gen.Status == "Approved" || gen.Status == "Closed")
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                @if (!string.IsNullOrEmpty(IdCar))
+                {
+                    <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+                }
+            </div>
+
+        </div>
+    </EditForm>
+</div>
+@code {
+    [Parameter]
+    public string IdCar { get; set; }
+    public
+    QAD_QMSContext db = new QAD_QMSContext();
+    SendEmailClass sendEmail = new SendEmailClass();
+    GeneralInformation gen = new GeneralInformation();
+    private IEnumerable<Customers> AllCustomers { get; set; }
+    private IEnumerable<DDepartment> AllDepartments { get; set; }
+    private List<DProcesses> ProcessesByDepartment { get; set; }
+    private List<DClauses> ClausesByProcess { get; set; }
+    private IEnumerable<DSubClauses> SubClausesByClause { get; set; }
+    IEnumerable<DRoles> GetAllRoles { get; set; }
+    IEnumerable<AspNetUsers> GetAllUsers { get; set; }
+    List<AspNetUsers> QaManagers { get; set; }
+    List<AspNetUsers> DepartmentManagers { get; set; }
+    List<AspNetUsers> Verifiers { get; set; }
+    List<DProcessRoles> processAssRoles = new List<DProcessRoles>();
+    public string IdCustomer { get; set; }
+    public string IdDepartment { get; set; }
+    public string loggedInUser = string.Empty;
+    public string IdProcess { get; set; }
+    public string IdClause { get; set; }
+    public string IdSubClause { get; set; }
+    private string idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public List<AspNetUsers> Owners { get; set; }
+    public string body { get; set; }
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+
+    enum types
+    {
+        Corrective,
+        Preventive
+    }
+    enum sources
+    {
+        Customer_Audit,
+        Self_Assesment,
+        Internal_Audit,
+        External_Audit,
+        Customer_Issue
+    }
+    enum severity
+    {
+        OFI,
+        Observation,
+        Minor,
+        Major,
+        Internal_Finding
+    }
+    public async Task SaveGeneralInformation()
+    {
+        int idCustomer = string.IsNullOrEmpty(IdCustomer) ? 0 : Convert.ToInt32(IdCustomer);
+        int idProcess = string.IsNullOrEmpty(IdProcess) ? 0 : Convert.ToInt32(IdProcess);
+        int idDepartment = string.IsNullOrEmpty(IdDepartment) ? 0 : Convert.ToInt32(IdDepartment);
+        int idClause = string.IsNullOrEmpty(IdClause) ? 0 : Convert.ToInt32(IdClause);
+        int idSubClause = string.IsNullOrEmpty(IdSubClause) ? 0 : Convert.ToInt32(IdSubClause);
+        gen.LastModifiedBy = loggedInUser;
+        gen.ProcessId = idProcess;
+        gen.DepartmentId = idDepartment;
+        gen.CustomerId = idCustomer;
+        gen.Clause = idClause;
+        gen.SubClause = idSubClause;
+        gen.Status = "Pending Action Plan Approval";
+        bool isNew = false;
+        if (string.IsNullOrEmpty(IdCar))
+        {
+            db.GeneralInformation.Add(gen);
+            isNew = true;
+        }
+        else
+        {
+            int id = gen.GeneralInformartionId;
+            gen = await db.GeneralInformation
+                    //.Include(y => y.Clause)
+                    //.Include(x => x.SubClause)
+                    //.Include(z => z.Process)
+                    .FirstOrDefaultAsync(x => x.IsDeleted == false && x.GeneralInformartionId == id);
+            db.Update(gen);
+
+        }
+        try
+        {
+            await db.SaveChangesAsync();
+            var find = await db.GeneralInformation.FirstOrDefaultAsync(x => x.IsDeleted == false && x.GeneralInformartionId == gen.GeneralInformartionId);
+            if (find != null)
+            {
+                find.CapaNumber = "CAPA" + find.GeneralInformartionId;
+                await db.SaveChangesAsync();
+            }
+            IdCar = gen.CapaNumber;
+            AlertShow("success", $"{IdCar} saved correctly.");
+            if (isNew)
+            {
+                string TeamMembers = string.Empty;
+                foreach (var member in processAssRoles)
+                {
+                    if (string.IsNullOrEmpty(TeamMembers))
+                    {
+                        TeamMembers = member.User.Email + ";";
+                    }
+                    else
+                    {
+                        TeamMembers += member.User.Email + ";";
+                    }
+                }
+                body = await GetEmailBody();
+                sendEmail = new SendEmailClass
+                    (
+                        gen.OwnerNavigation.Email,
+                        TeamMembers,
+                        body,
+                        $"New Capa No.: {IdCar} created"
+                    );
+                var email = sendEmail.SendEmailGeneric();
+            }
+            NavigationManager.NavigateTo($"/Admin/general/{gen.GeneralInformartionId.ToString()}");
+        }
+        catch (Exception ex)
+        {
+            AlertShow("danger", ex.InnerException.ToString());
+            return;
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(Task.Run(() => GetInitialData()));
+        var principal = HttpContextAccessor.HttpContext?.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+
+        if (string.IsNullOrEmpty(IdCar))
+        {
+            gen.Created = DateTime.Now;
+            gen.Status = "Pending Action Plan Approval";
+            gen.CreatedBy = loggedInUser;
+            gen.ExpectedClosureDate = DateTime.Now.AddDays(30);
+        }
+        else
+        {
+            CarIdNumber = Convert.ToInt32(IdCar);
+            IdCar = $"CAPA{IdCar}";
+            await Task.WhenAll(Task.Run(() => GetInitialDataWhenExists(CarIdNumber)));
+            IdSubClause = gen.SubClause.ToString();
+        }
+    }
+    protected async Task GetInitialData()
+    {
+        AllCustomers = await GetCustomersList();
+        AllDepartments = await GetAllDepartments();
+        GetAllRoles = await AllRoles();
+        GetAllUsers = await GetAllUsersM();
+        QaManagers = await GetManagers();
+        DepartmentManagers = await GetDepartmentManagers();
+        Verifiers = await GetVerifiers();
+        Owners = await GetOwners();
+    }
+    protected async Task GetInitialDataWhenExists(int id)
+    {
+        gen = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == id);
+        IdCustomer = gen.CustomerId.ToString();
+        IdDepartment = gen.DepartmentId.ToString();
+        await DepartmentHasChanged(IdDepartment);
+        IdProcess = gen.ProcessId.ToString();
+        await ProcessHasChanged(IdProcess);
+        IdClause = gen.Clause.ToString();
+        await ClauseHasChanged(IdClause);
+    }
+    private async Task<List<Customers>> GetCustomersList()
+    {
+        return await db.Customers.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task<List<DProcesses>> GetProcessListM(int iddepartment)
+    {
+        return await db.DProcesses.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task<List<AspNetUsers>> GetOwners()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    private async Task<List<DDepartment>> GetAllDepartments()
+    {
+        return await db.DDepartment.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task DepartmentHasChanged(string iddepartment)
+    {
+        IdDepartment = iddepartment;
+        int id = Convert.ToInt32(IdDepartment);
+        List<DDepartmentProcesses> processList = new List<DDepartmentProcesses>();
+        processList = await db.DDepartmentProcesses.Where(x => x.DepartmentId == id).ToListAsync();
+        ProcessesByDepartment = new List<DProcesses>();
+
+        foreach (var process in processList)
+        {
+            var p = await db.DProcesses.FirstOrDefaultAsync(x => x.ProcessId == process.ProcessId);
+            ProcessesByDepartment.Add(p);
+        }
+    }
+    private async Task ProcessHasChanged(string idprocess)
+    {
+        IdProcess = idprocess;
+        int id = Convert.ToInt32(IdProcess);
+        List<DProcessClauses> clauseList = new List<DProcessClauses>();
+        clauseList = await db.DProcessClauses.Where(x => x.ProcessId == id).ToListAsync();
+        ClausesByProcess = new List<DClauses>();
+
+        foreach (var clause in clauseList)
+        {
+            var c = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == clause.ClauseId);
+            ClausesByProcess.Add(c);
+        }
+        processAssRoles = await GetProcessRoles(id);       
+       
+    }
+    private async Task<List<DProcessRoles>> GetProcessRoles(int id)
+    {
+        return await db.DProcessRoles.Where(x => x.ProcessId == id).ToListAsync();
+    }
+    private async Task ClauseHasChanged(string idclause)
+    {
+        IdClause = idclause;
+        int id = Convert.ToInt32(IdClause);
+        SubClausesByClause = await db.DSubClauses.Where(x => x.ClauseId == id).ToListAsync();
+    }
+    private async Task<List<DRoles>> AllRoles()
+    {
+        return await db.DRoles.ToListAsync();
+    }
+    private async Task<List<AspNetUsers>> GetAllUsersM()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    private async Task<List<AspNetUsers>> GetManagers()
+    {
+        var usersInRole = await db.AspNetUserRoles.Where(x => x.RoleId == "ae0d7059-11ce-450b-932e-013f50cfe20f").ToListAsync();
+        QaManagers = new List<AspNetUsers>();
+        foreach (var manager in usersInRole)
+        {
+            QaManagers.Add(manager.User);
+        }
+        return QaManagers;
+    }
+    private async Task<List<AspNetUsers>> GetVerifiers()
+    {
+        var usersInRole = await db.AspNetUserRoles.Where(x => x.RoleId == "ff6f6f18-e596-4bcc-8263-318d17ff3baa").ToListAsync();
+        Verifiers = new List<AspNetUsers>();
+        foreach (var verifier in usersInRole)
+        {
+            Verifiers.Add(verifier.User);
+        }
+        return Verifiers;
+    }
+    private async Task<List<AspNetUsers>> GetDepartmentManagers()
+    {
+        var usersInRole = await db.AspNetUserRoles.Where(x => x.RoleId == "da38b7a3-358f-477d-9d50-6033517f5ec4").ToListAsync();
+        DepartmentManagers = new List<AspNetUsers>();
+        foreach (var manager in usersInRole)
+        {
+            DepartmentManagers.Add(manager.User);
+        }
+        return DepartmentManagers;
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    protected async Task<string> GetEmailBody()
+    {
+        string tdStyle = "border: 1px solid #ddd; padding: 8px; margin:auto;";
+        string thStyle = "border: 1px solid #ddd; padding-top: 12px; padding-bottom: 12px; background-color: #800080; color:white;";
+
+        var g = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == gen.GeneralInformartionId);
+        var qamanager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.QaManagerApprover);
+        var approver = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.DepartmentApprover);
+        var verifier = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.Verifier);
+        var clause = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == gen.Clause);
+        body += $"<strong>Expected Closure Date:  {gen.ExpectedClosureDate.ToShortDateString()}</strong>";
+        body += $"<table border='1' style='border-collapse:collapse; width:100%; padding-top:12px;font-family: Arial, Helvetica, sans-serif;'>";
+        body += $"<thead>";
+        body += $"<tr>";
+        body += $"<th style='{thStyle}'>CAPA Number</th>";
+        body += $"<th style='{thStyle}'>CAPA Type</th>";
+        body += $"<th style='{thStyle}'>Source</th>";
+        body += $"<th style='{thStyle}'>Standard</th>";
+        body += $"<th style='{thStyle}'>Clause</th>";
+        body += $"<th style='{thStyle}'>Process</th>";
+        body += $"<th style='{thStyle}'>Severity</th>";
+        body += $"<th style='{thStyle}'>Symptom</th>";
+        body += $"<th style='{thStyle}'>Owner</th>";
+        body += $"<th style='{thStyle}'>Department Manager</th>";
+        body += $"</t>";
+        body += $"</thead>";
+        body += $"<tbody>";
+        body += $"<tr>";
+        body += $"<td style='{tdStyle}'>{ g.CapaNumber}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Type}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Source}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Standard}</td>";
+        body += $"<td style='{tdStyle}'>{ clause.ClauseNumber} {clause.ClauseName}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Process.ProcessName}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Severity}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Symptom}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.OwnerNavigation.NormalizedUserName.Substring(0, gen.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"<td style='{tdStyle}'>{ approver.NormalizedUserName.Substring(0, approver.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"</tr>";
+        body += @"</tbody></table>";
+        body += $"<p>CAPA requires you're attention, click the <a href='http://10.131.40.41:4401/Admin/general/{gen.GeneralInformartionId}'>Link</a> to access the system.</p>";
+        return body;
+
+    }
+}

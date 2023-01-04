@@ -1,0 +1,372 @@
+﻿@page "/"
+@attribute [Authorize]
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+<AuthorizeView>
+    <div class="card-columns">
+        <div class="card @Tasks text-white al-dash">
+            <div class="card-body">
+                <span class="badge @TaskBadge">eCapa work list</span>
+                @if (TaskList == null)
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-clipboard text-black-50" aria-hidden="true"> @TotalCount</span>
+                        </h1>
+                        <a href="implementation"><strong>My work list</strong></a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-clipboard text-black-50 " aria-hidden="true"> @TotalCount</span>
+                        </h1>
+                        <a href="implementation"><strong>My work list</strong></a>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="card text-white al-dash">
+            <div class="card-body">
+                <span class="badge bg-success text-white @TaskSixtyBadge">Pending 60 Day Effectiveness Verification</span>
+                @if (TaskSixDaytyVerificationList == null || TaskSixDaytyVerificationList.Count() == 0)
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> 0</span>
+                        </h1>
+                        <a href="verification"><strong>My 60 day effectiveness validation list</strong></a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> @TaskSixDaytyVerificationList.Count()</span>
+                        </h1>
+                        <a href="verification"><strong>My 60 day effectiveness validation list</strong></a>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="card text-white al-dash">
+            <div class="card-body">
+                <span class="badge bg-success text-white @VerificationBadge">Pending Verifications</span>
+                @if (TaskVerificationList == null)
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> @TotalVerificationCount</span>
+                        </h1>
+                        <a href="verification"><strong>My verification list</strong></a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> @TotalVerificationCount</span>
+                        </h1>
+                        <a href="verification"><strong>My verification list</strong></a>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="card text-white al-dash">
+            <div class="card-body">
+                <span class="badge bg-success text-white @TaskNinetyBadge">Pending 90 Day Effectiveness Verifications</span>
+                @if (TaskNinetyDaytyVerificationList == null || TaskNinetyDaytyVerificationList.Count() == 0)
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> 0</span>
+                        </h1>
+                        <a href="verification"><strong>My 90 day effectiveness validation list</strong></a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-spreadsheet text-black-50" aria-hidden="true"> @TaskNinetyDaytyVerificationList.Count()</span>
+                        </h1>
+                        <a href="verification"><strong>My verification list</strong></a>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="card text-white al-dash">
+            <div class="card-body">
+                <span class="badge bg-success text-white @CapaBadge">Pending Approvals</span>
+                @if (CAPAList == null)
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-task text-black-50" aria-hidden="true"> @CapaApprovalCount</span>
+                        </h1>
+                        <a href="approval"><strong>My capa approval list</strong></a>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center">
+                        <h1 class="text-center">
+                            <span class="oi oi-task text-black-50" aria-hidden="true"> @CapaApprovalCount</span>
+                        </h1>
+                        <a href="approval"><strong>My capa approval list</strong></a>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div>   
+</AuthorizeView>
+
+@code{
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    public IEnumerable<DfiveActions> TaskList { get; set; }
+    public IEnumerable<Dthree> ContainmentList { get; set; }
+    public IEnumerable<Dthree> ContainmentVerificationList { get; set; }
+    public IEnumerable<DfiveActions> TaskVerificationList { get; set; }
+    public IEnumerable<DfiveActions> TaskSixDaytyVerificationList { get; set; }
+    public IEnumerable<DfiveActions> TaskNinetyDaytyVerificationList { get; set; }
+    public IEnumerable<GeneralInformation> CAPAList { get; set; } = null;
+    public int TotalCount{get;set;} = 0;
+    public int TotalVerificationCount { get; set; } = 0;    
+    public int CapaApprovalCount { get; set; }
+    public string Tasks { get; set; } = string.Empty;
+    public string Verifications { get; set; } = string.Empty;
+    public string Capas { get; set; } = string.Empty;
+    public string TasksSixty { get; set; } = string.Empty;
+    public string TasksNinety { get; set; } = string.Empty;
+    public string VerificationBadge { get; set; } = "bg-success";
+    public string TaskBadge { get; set; } = "bg-success";
+    public string TaskSixtyBadge { get; set; } = "bg-success";
+    public string TaskNinetyBadge { get; set; } = "bg-success";
+    public string CapaBadge { get; set; } = "bg-success";
+
+
+    public string loggedInUser { get; set; }
+    public bool isQaManager { get; set; }
+    public bool isDeptManager { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        isQaManager = HttpContextAccessor.HttpContext.User.IsInRole("QaManager");
+        isDeptManager = HttpContextAccessor.HttpContext.User.IsInRole("FunctionalManager");
+        await Task.WhenAll(Task.Run(() => GetInitialData()));
+    }
+    protected async Task GetInitialData()
+    {
+        TaskList = await GetTasks();
+        TaskSixDaytyVerificationList = await GetSixtyDayTasks();
+        TaskNinetyDaytyVerificationList = await GetNinetyDayTasks();
+        ContainmentList = await GetContainmentTasks();
+        TotalCount = TaskList.Count() + ContainmentList.Count();
+        ContainmentVerificationList =  await GetContainmentVerifications();
+        TaskVerificationList = await GetTasksVerifiaction();
+        TotalVerificationCount = ContainmentVerificationList.Count() + TaskVerificationList.Count();
+
+        if (isQaManager)
+        {
+            CAPAList = await GetCapasToApproveQa();
+        }
+        if (isDeptManager)
+        {
+            CAPAList = await GetCapasToApproveFunctional();
+        }
+
+        CapaApprovalCount = CAPAList == null ? 0 : CAPAList.Count();
+
+        if(TotalCount > 0)
+        {
+            Tasks = "bg-default";
+            TaskBadge = "bg-warning";
+        }
+        else
+        {
+            Tasks = "bg-default";
+            TaskBadge = "bg-info";
+        }
+        if(TotalVerificationCount > 0)
+        {
+            Verifications = "bg-danger";
+            VerificationBadge = "bg-warning";
+        }
+        else
+        {
+            Verifications = "bg-default";
+            VerificationBadge = "bg-info";
+        }
+        if(TaskSixDaytyVerificationList == null)
+        {
+            TasksSixty = "bg-default";
+            TaskSixtyBadge = "bg-info";
+
+        }
+        else
+        {
+            if(TaskSixDaytyVerificationList.Count() > 0)
+            {
+                TasksSixty = "bg-danger";
+                TaskSixtyBadge = "bg-warning";
+            }
+            else
+            {
+                TasksSixty = "bg-success";
+                TaskSixtyBadge = "bg-info";
+            }
+        }
+        if(TaskNinetyDaytyVerificationList == null)
+        {
+            TasksNinety = "bg-success";
+            TaskNinetyBadge = "bg-info";
+
+        }
+        else
+        {
+            if (TaskNinetyDaytyVerificationList.Count() > 0)
+            {
+                TasksNinety = "bg-danger";
+                TaskNinetyBadge = "bg-warning";
+            }
+            else
+            {
+                TasksNinety = "bg-success";
+                TaskNinetyBadge = "bg-info";
+            }
+        }
+        if(CapaApprovalCount > 0)
+        {
+            Capas = "bg-danger";
+            CapaBadge = "bg-warning";
+        }
+        else
+        {
+            Capas = "bg-success";
+            CapaBadge = "bg-info";
+        }
+    }
+    protected async Task<IEnumerable<Dthree>> GetContainmentTasks()
+    {
+        var openContainment = await db.Dthree
+        .Include
+        (
+            x => x.GeneralInformartion
+        )
+        .Where
+        (
+            x => x.Responsible == loggedInUser &&
+            x.IsDeleted == false &&
+            x.GeneralInformartion.IsDeleted == false &&
+            x.Status == "Open"
+        )
+        .ToListAsync();
+        return openContainment;
+    }
+    protected async Task<IEnumerable<GeneralInformation>> GetCapasToApproveQa()
+    {
+        IQueryable<GeneralInformation> capas = (
+            from g in db.GeneralInformation
+            where g.IsDeleted.Equals(false) && g.Status.Equals("Pending Action Plan Approval") && g.QaManagerApprover.Equals(loggedInUser)
+            join f in db.Dfive on g.GeneralInformartionId equals f.GeneralInformartionId
+            where f.QaApprovalStatus.Equals("Pending Action Plan Approval")
+            select g
+            );
+        return await capas.ToListAsync();
+    }
+    protected async Task<IEnumerable<GeneralInformation>> GetCapasToApproveFunctional()
+    {
+        IQueryable<GeneralInformation> capas = (
+            from g in db.GeneralInformation
+            where g.IsDeleted.Equals(false) && g.Status.Equals("Pending Action Plan Approval") && g.DepartmentApprover.Equals(loggedInUser)
+            join f in db.Dfive on g.GeneralInformartionId equals f.GeneralInformartionId
+            where f.FunctionalApprovalStatus.Equals("Pending Action Plan Approval")
+            select g
+            );
+        return await capas.ToListAsync();
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetTasksVerifiaction()
+    {
+        var openTasksVerifications = await db.DfiveActions
+        .Include
+        (
+            x => x.IdActionPlanNavigation
+        )
+        .ThenInclude
+        (
+            x => x.GeneralInformartion
+        )
+        .Where
+        (
+            x => x.IdActionPlanNavigation.GeneralInformartion.Verifier == loggedInUser &&
+            x.IsDeleted == false &&
+            x.IdActionPlanNavigation.GeneralInformartion.IsDeleted == false &&
+            x.EffectivenessVerificationStatusOne == "Pending"
+        )
+        .ToListAsync();
+        return openTasksVerifications;
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetTasks()
+    {
+        var openTasks = await db.DfiveActions.Where(x => x.Owner == loggedInUser && x.IsDeleted == false)
+            .Include( x => x.IdActionPlanNavigation)
+            .Include(x => x.IdActionPlanNavigation.GeneralInformartion)
+            .Where(x =>
+            x.IdActionPlanNavigation.GeneralInformartion.IsDeleted == false &&
+            x.Status == "Pending Action Plan Approval" || x.Status == "Open"
+            )
+            .ToListAsync();
+        return openTasks;
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetSixtyDayTasks()
+    {
+        var openTasks = await db.DfiveActions
+            .Where(
+            x => x.Owner == loggedInUser &&
+            x.EffectivenessVerificationStatusOne == "Verified" &&
+            x.EffectivenessVerificationStatusTwo == "Pending" &&
+            x.EffectivenessVerificationDateTwo >= DateTime.Today &&
+            x.IsDeleted == false
+            )
+            .ToListAsync();
+        return openTasks;
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetNinetyDayTasks()
+    {
+        var openTasks = await db.DfiveActions
+            .Where(
+            x => x.Owner == loggedInUser &&
+            x.Status != "Pending Action Plan Approval" &&
+            x.Status != "Pending Verification" &&
+            x.Status != "Closed" &&
+            x.EffectivenessVerificationStatusOne == "Verified" &&
+            x.EffectivenessVerificationStatusTwo == "Verified" &&
+            x.EffectivenessVerificationStatusThree == "Pending" &&
+            x.EffectivenessVerificationDateThree >= DateTime.Today &&
+            x.IsDeleted == false &&
+            x.IdActionPlanNavigation.GeneralInformartion.IsDeleted == false
+            )
+            .ToListAsync();
+        return openTasks;
+    }
+    protected async Task<IEnumerable<Dthree>> GetContainmentVerifications()
+    {
+        var openContainmentVerifications = await db.Dthree
+        .Include
+        (
+            x => x.GeneralInformartion).Where(
+            x => x.GeneralInformartion.Verifier == loggedInUser &&
+            x.EffectivenessVerificationStatusOne == "Pending" &&
+            x.GeneralInformartion.IsDeleted == false &&
+            x.IsDeleted == false
+        )
+        .ToListAsync();
+        return openContainmentVerifications;
+    }
+}

@@ -1,0 +1,203 @@
+﻿@page "/Admin/d8/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+    <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+            ×
+        </button>
+        @AlertMessage
+    </div>
+    <EditForm Model="@d8" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">D8 – Team and Individual Recognition</h3>
+                <InputText @bind-Value="IdCar" readonly="true" class="form-control" placeholder="CAR Number" />
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText @bind-Value="d8.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                    <InputDate @bind-Value="d8.Created" hidden class="form-control" placeholder="Date Created" />
+                    <div class="form-group col-sm-12 col-md-12">
+                        <table class="table table-bordered table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>
+                                        Team and Individual Recognition?
+                                    </th>
+                                    <th colspan="2" class="text-center">Yes/No?</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                       Are all actions closed or have open actions been transferred to others?
+                                    </td>
+                                    <td class="text-center"><InputCheckbox @bind-Value="d8.ActionsClosed" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(d8.ActionsClosed == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Is all the applicable data and evidence of the investigation centrally stored?</td>
+                                    <td class="text-center "><InputCheckbox @bind-Value="d8.EvidenceCentrallyStored" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(d8.EvidenceCentrallyStored == false ? "No" : "Yes")</td>
+                                </tr>
+                                <tr>
+                                    <td>Reward the team and the individual team members:</td>
+                                    <td class="text-center"> <InputCheckbox @bind-Value="d8.TeamRewarded" class="form-check mt-2 icon"></InputCheckbox></td>
+                                    <td>@(d8.TeamRewarded == false ? "No" : "Yes")</td>
+                                </tr>                              
+                            </tbody>
+                        </table>
+                    </div>                  
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (General.Status != "Approved" && General.Status != "Closed")
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save, Reward & Close</button>
+                }
+                else
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+@code {
+    public bool PictureDialogOpen { get; set; }
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    protected string FilePaths { get; set; }
+    QAD_QMSContext db = new QAD_QMSContext();
+    Deight d8 = new Deight();
+    [Parameter]
+    public string IdCar { get; set; }
+    private int idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public string ProblemState { get; set; }
+    public string ProblemDesc { get; set; }
+    public bool hide { get; set; } = true;
+    public bool hide2 { get; set; } = true;
+    public bool hideFileUploadButton { get; set; } = true;
+    public bool hideButton { get; set; } = false;
+    public bool hideCancelButton { get; set; } = true;
+    public bool HideAlert { get; set; } = true;
+    GeneralInformation General = new GeneralInformation();
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        d8.LastModifiedBy = loggedInUser;
+        d8.GeneralInformationId = CarIdNumber;
+
+        if (d8.IdDeight == 0)
+        {
+            db.Deight.Add(d8);
+            await db.SaveChangesAsync();
+        }
+        else
+        {
+            db.Deight.Update(d8);
+            try
+            {
+                await db.SaveChangesAsync();
+                await js.InvokeAsync<Task>("alert", $"D7 saved correctly.");
+                NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+            }
+            catch (Exception)
+            {
+
+                AlertShow("danger", $"There was an error saving.");
+                return;
+            }
+
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        d8 = await db.Deight.FirstOrDefaultAsync(x => x.GeneralInformationId == CarIdNumber && x.IsDeleted == false);
+        if (d8 == null)
+        {
+            d8 = new Deight();
+            d8.Created = DateTime.Now;
+            var principal = HttpContextAccessor.HttpContext.User;
+            loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+            d8.CreatedBy = loggedInUser;
+            hide = true;
+            hide2 = true;
+        }
+        else
+        {
+            hide = false;
+            hide2 = false;
+            General = new GeneralInformation();
+            General = await GetGeneralInformation();
+        }
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    private async Task OnDialogClose()
+    {
+        await Task.Run(() => PictureDialogOpen = false);
+        StateHasChanged();
+    }
+    private void OpenDeleteDialog(int id)
+    {
+        idtopass = id;
+        PictureDialogOpen = true;
+        StateHasChanged();
+    }
+    private void ShowFileUploadButton()
+    {
+        if (hideFileUploadButton == true)
+        {
+            hideFileUploadButton = false;
+            hideButton = true;
+            hideCancelButton = !hideButton;
+        }
+        else
+        {
+            hideFileUploadButton = true;
+            hideButton = false;
+            hideCancelButton = !hideButton;
+
+        }
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+}

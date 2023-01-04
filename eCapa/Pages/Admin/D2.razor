@@ -1,0 +1,312 @@
+﻿@page "/Admin/d2/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+     <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+      @AlertMessage
+    </div>
+    <EditForm Model="@d2" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">D2 – Describe the problem</h3>
+                <InputText @bind-Value="IdCar" readonly="true" class="form-control" placeholder="CAR Number" />
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText @bind-Value="d2.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                    <InputDate @bind-Value="d2.Created" hidden class="form-control" placeholder="Date Created" />
+                    <div class="form-group col-sm-12 col-md-12">
+                        <InputTextArea @bind-Value="d2.ProblemStatement" rows="4" @onblur="@(()=>SaveGeneralInformation())" class="form-control" placeholder="What is the (factual) deviation on the object/System/Standard/Requirement/Others:" />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-12">
+                        <InputText @bind-Value="d2.ProblemDefinition" @onblur="@(()=>SaveGeneralInformation())" class="form-control" placeholder="What are you going to investigate:" />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-12">
+                        <button type="button" class="btn btn-success float-lg-left" @onclick="@(() => ShowFileUploadButton())" hidden="@hideButton">Add Problem Pictures</button>
+                        <button type="button" class="btn btn-danger float-lg-left" @onclick="@(() => ShowFileUploadButton())" hidden="@hideCancelButton">Cancel</button>
+                    </div>
+                    <div class="form-group col-sm-12 col-md-12">
+                        <InputFile OnChange="HandleFileSelected" multiple hidden="@hideFileUploadButton" />
+                    </div>
+                    @if (getPictures.Count() > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-sm small">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th colspan="2">Image</th>
+                                        <th colspan="2">File Name</th>
+                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                        {
+                                            <th colspan="2">Action</th>
+                                        }
+                                        </tr>
+                                </thead>
+                                <tbody>
+
+                                    @foreach (var a in getPictures)
+                                    {
+                                    <tr>
+                                        <td colspan="2">
+                                            <a href="/Upload/@IdCar/@a.Filename" class="ml-4 btn btn-outline-info btn-sm"><img src="/Upload/@IdCar/@a.Filename" width="100" height="100" class="img-thumbnail" /></a>
+                                        </td>
+                                        <td colspan="2">@a.Filename</td>
+                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                        {
+                                            <td colspan="2">
+                                                <span @onclick="@(async () => await MarkAsDeleted(a.PictureId, a.Filename))" class="oi oi-trash border-info text-danger col-12 icon" aria-hidden="true"></span>
+                                            </td>
+                                        }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (General.Status != "Approved" && General.Status != "Closed")
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+        </div>
+    </EditForm>   
+</div>
+@code {
+    public bool PictureDialogOpen { get; set; }
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    protected string FilePaths { get; set; }
+    QAD_QMSContext db = new QAD_QMSContext();
+    Dtwo d2 = new Dtwo();
+    DtwoPictures pics = new DtwoPictures();
+    List<DtwoPictures> getPictures = new List<DtwoPictures>();
+    [Parameter]
+    public string IdCar { get; set; }
+    private int idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public string ProblemState { get; set; }
+    public string ProblemDesc { get; set; }
+    public bool hide { get; set; } = true;
+    public bool hideFileUploadButton { get; set; } = true;
+    public bool hideButton { get; set; } = false;
+    public bool hideCancelButton { get; set; } = true;
+    public bool HideAlert  { get; set; } = true;
+    GeneralInformation General = new GeneralInformation();
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } ="danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        d2.LastModifiedBy = loggedInUser;
+        d2.GeneralInformartionId = CarIdNumber;
+
+        if (d2.IdDtwo == 0)
+        {
+            db.Dtwo.Add(d2);
+            await db.SaveChangesAsync();
+            foreach (var f in getPictures)
+            {
+                pics = new DtwoPictures();
+                pics.IdTwo = d2.IdDtwo;
+                pics.Filename = f.Filename;
+                db.DtwoPictures.Add(pics);
+                try
+                {
+                    await db.SaveChangesAsync();
+
+                    AlertShow("success",$"D2 saved correctly.");
+                    //NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+                }
+                catch (Exception)
+                {
+
+                    AlertShow("danger", $"There was an error saving.");
+                    return;
+                }
+
+            }
+        }
+        else
+        {
+            db.Dtwo.Update(d2);
+            foreach (var f in getPictures)
+            {
+                var exists = await db.DtwoPictures.FirstOrDefaultAsync(x => x.PictureId == f.PictureId);
+                if(exists == null)
+                {
+                    pics = new DtwoPictures();
+                    pics.IdTwo = d2.IdDtwo;
+                    pics.Filename = f.Filename;
+                    db.DtwoPictures.Add(pics);
+                }
+            }
+            try
+            {
+                await db.SaveChangesAsync();
+                AlertShow("success", $"D2 saved correctly.");
+                //await js.InvokeAsync<Task>("alert", $"D2 saved correctly.");
+                //NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+            }
+            catch (Exception)
+            {
+
+                AlertShow("danger", $"There was an error saving.");
+                return;
+            }
+
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        Dtwo d2Exists = await db.Dtwo.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false);
+        if(d2Exists == null)
+        {
+            d2.Created = DateTime.Now;
+            var principal = HttpContextAccessor.HttpContext.User;
+            loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+            d2.CreatedBy = loggedInUser;
+            hide = true;
+        }
+        else
+        {
+            d2 = d2Exists;
+            getPictures = await PicturesList(d2.IdDtwo);
+            hide = false;
+            General = new GeneralInformation();
+            General = await GetGeneralInformation();
+        }
+    }
+    protected async Task HandleFileSelected(IFileListEntry[] files)
+    {
+        var isSaved = await db.Dtwo.FirstOrDefaultAsync(x => x.IdDtwo == d2.IdDtwo);
+        if(isSaved == null)
+        {
+            AlertShow("warning", "D2 Must be saved before adding Images");
+            return;
+        }
+        foreach(var f in files)
+        {
+            pics = new DtwoPictures();
+            pics.Filename = f.Name;
+            pics.IdTwo = Convert.ToInt32(CarIdNumber);
+            getPictures.Add(pics);
+            if (f != null)
+            {
+                await fileUpload.UploadAsync(f, IdCar);
+            }
+
+        }
+    }
+    protected async Task MarkAsDeleted(int id, string filename)
+    {
+
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+
+            if(id == 0)
+            {
+                RemoveUnsavedPicture(filename);
+            }
+            else
+            {
+                var picture = await db.DtwoPictures.FirstOrDefaultAsync(x => x.PictureId == id);
+                db.DtwoPictures.Remove(picture);
+                var deleted = await db.SaveChangesAsync();
+                if (deleted > 0)
+                {
+                    fileUpload.DeleteFile(IdCar, picture.Filename);
+                }
+            }
+        }
+        else
+        {
+            return;
+        }
+        getPictures = await PicturesList(d2.IdDtwo);
+    }
+    protected void RemoveUnsavedPicture(string filename)
+    {
+        int index = getPictures.FindIndex(x => x.Filename == filename);
+        getPictures.RemoveAt(index);
+        fileUpload.DeleteFile(IdCar, filename);
+    }
+    private async Task<List<DtwoPictures>> PicturesList(int id)
+    {
+        return await db.DtwoPictures.Where(x => x.IdTwo == id).ToListAsync();
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    private async Task OnDialogClose()
+    {
+        await Task.Run(()=>PictureDialogOpen = false);
+        StateHasChanged();
+    }
+    private void OpenDeleteDialog(int id)
+    {
+        idtopass = id;
+        PictureDialogOpen = true;
+        StateHasChanged();
+    }
+    private void ShowFileUploadButton()
+    {
+        if(hideFileUploadButton == true)
+        {
+            hideFileUploadButton = false;
+            hideButton = true;
+            hideCancelButton = !hideButton;
+        }
+        else
+        {
+            hideFileUploadButton = true;
+            hideButton = false;
+            hideCancelButton = !hideButton;
+
+        }
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+}

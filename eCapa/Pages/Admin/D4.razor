@@ -1,0 +1,611 @@
+﻿@page "/Admin/d4/{IdCar}"
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+     <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+      @AlertMessage
+    </div>
+    <div class="alert alert-primary" role="alert">
+        Complete the 3 Leg 5 Why to help identify the root cause, then select the appropriate root cause for each leg.
+    </div>
+    <EditForm Model="@d4" OnValidSubmit="@SaveGeneralInformation" class="">
+        <div class="card">
+
+            <div class="card-header">
+                <h3 class="mb-3">D4 – Identify Problem Root Cause</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-12 col-md-12 col-lg-12">
+
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                       
+                                <h3 class="mb-3 ml-2">3L5Why</h3>
+                                <InputText @bind-Value="IdCar" hidden readonly="true" class="form-control" placeholder="CAR Number" />
+                                <p class="ml-2"><b>Problem Description:</b> @problem.ProblemStatement</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-row">
+                                    <div class="form-group col-12 col-sm-12 col-md-4">
+                                        <InputSelect @bind-Value="@d4.Type" class="form-control">
+                                            <option selected disabled value="">Select Type</option>
+                                            @foreach (var type in Enum.GetValues(typeof(types)))
+                                            {
+                                                <option value="@type">@type</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <InputText @bind-Value="d4.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                                    <InputDate @bind-Value="d4.Created" hidden class="form-control" placeholder="Date Created" />
+                                    <div class="form-group col-sm-12 col-md-12">
+                                        <label>Which causes contribute to the problem as defined in D2?</label>
+                                        <InputTextArea @bind-Value="d4.Why" rows="4" class="form-control" required="true" placeholder="Why?" />
+                                    </div>
+                                    <div class="form-group form-check-inline col-sm-12 col-md-12 ml-2">
+                                        <p><InputCheckbox @bind-Value="d4.IsRootCause" class="form-check-input" />Root Cause?</p>
+                                    </div>
+                                    <div class="form-group form-check-inline col-sm-12 col-md-12 ml-2">
+                                        <p><InputCheckbox @bind-Value="d4.ImpactOthers" class="form-check-input" @onclick="@(() => CheckChanged())" />The root cause impacts other similar processes or products?</p>
+                                    </div>
+                                    <div class="form-group col-sm-12 col-md-12" hidden="@hidediv">
+                                        <InputTextArea @bind-Value="d4.Explain" required="@required" rows="4" class="form-control" placeholder="Describe how the root cause IMPACTS other process?" />
+                                    </div>
+                                    <div class="col-md-12">
+                                        <div class="row">
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetORootCauses != null)
+                                                {
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            Ocurrence RC Result
+                                                        </div>
+
+                                                        <ul class="list-group list-group-flush">
+                                                            @foreach (var item in GetORootCauses)
+                                                            {
+                                                                <li class="list-group-item">@item.Why</li>
+                                                            }
+                                                        </ul>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetERootCauses != null)
+                                                {
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            Escape RC Result
+                                                        </div>
+
+                                                        <ul class="list-group list-group-flush">
+                                                            @foreach (var item in GetERootCauses)
+                                                            {
+                                                                <li class="list-group-item">@item.Why</li>
+                                                            }
+                                                        </ul>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetSRootCauses != null)
+                                                {
+                                                    <div class="card">
+                                                        <div class="card-header">
+                                                            Systemic RC Result
+                                                        </div>
+
+                                                        <ul class="list-group list-group-flush">
+                                                            @foreach (var item in GetSRootCauses)
+                                                            {
+                                                                <li class="list-group-item">@item.Why</li>
+                                                            }
+                                                        </ul>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div class="row mt-3">
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetOWhys != null)
+                                                {
+                                                    @if (GetOWhys.Count() > 0)
+                                                    {
+                                                        <div class="table-responsive">
+                                                            <table class="table table-bordered table-striped table-sm small">
+                                                                <thead class="thead-light">
+                                                                    <tr>
+                                                                        <th>Why</th>
+                                                                        <th>Type</th>
+                                                                        <th>Is Root Cause?</th>
+                                                                        <th>Impacts Other Process?</th>
+                                                                        <th>Explain Which Processes</th>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <th>Action</th>
+                                                                        }
+
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+
+                                                                    @foreach (var w in GetOWhys)
+                                                                    {
+                                                                    <tr>
+                                                                        <td>@w.Why</td>
+                                                                        <td>@w.Type</td>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td class="text-center"><button type="button" class="badge badge-success" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td class="text-center"><button type="button" class="badge badge-danger" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td class="text-center"><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td class="text-center"><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+
+                                                                        }
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td class="text-center"><button type="button" class="badge badge-success" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td class="text-center"><button type="button" class="badge badge-danger" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td class="text-center"><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td class="text-center"><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        <td>@w.Explain</td>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <td>
+                                                                                <span @onclick="@(async () => await MarkAsDeleted(w.IdFour))" class="oi oi-trash border-info text-danger icon" aria-hidden="true"></span>
+                                                                            </td>
+                                                                        }
+                                                                    </tr>
+                                                                    }
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetEWhys != null)
+                                                {
+                                                    @if (GetEWhys.Count() > 0)
+                                                    {
+                                                        <div class="table-responsive">
+                                                            <table class="table table-bordered table-striped table-sm small">
+                                                                <thead class="thead-light">
+                                                                    <tr>
+                                                                        <th>Why</th>
+                                                                        <th>Type</th>
+                                                                        <th>Is Root Cause?</th>
+                                                                        <th>Impacts Other Process?</th>
+                                                                        <th>Explain Which Processes</th>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <th>Action</th>
+                                                                        }
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+
+                                                                    @foreach (var w in GetEWhys)
+                                                                    {
+                                                                    <tr>
+                                                                        <td>@w.Why</td>
+                                                                        <td>@w.Type</td>
+                                                                        @if (General.Status == "Approved" && General.Status == "Closed")
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-success" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-danger" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+                                                                        }
+
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td><button type="button" class="badge badge-success" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-danger" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        <td>@w.Explain</td>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <td><span @onclick="@(async () => await MarkAsDeleted(w.IdFour))" class="oi oi-trash border-info text-danger icon" aria-hidden="true"></span></td>
+                                                                        }
+                                                                    </tr>
+                                                                    }
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    }
+                                                }
+
+                                            </div>
+                                            <div class="col-12 col-sm-12 col-md-4">
+                                                @if (GetSWhys != null)
+                                                {
+                                                    @if (GetSWhys.Count() > 0)
+                                                    {
+                                                        <div class="table-responsive">
+                                                            <table class="table table-bordered table-striped table-sm small">
+                                                                <thead class="thead-light">
+                                                                    <tr>
+                                                                        <th>Why</th>
+                                                                        <th>Type</th>
+                                                                        <th>Is Root Cause?</th>
+                                                                        <th>Impacts Other Process?</th>
+                                                                        <th>Explain Which Processes</th>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <th>Action</th>
+                                                                        }
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+
+                                                                    @foreach (var w in GetSWhys)
+                                                                    {
+                                                                    <tr>
+                                                                        <td>@w.Why</td>
+                                                                        <td>@w.Type</td>
+                                                                        @if (General.Status == "Approved" && General.Status == "Closed")
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-success" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-danger" @onclick="@(async () => await MarkAsRootCause(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.IsRootCause)
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td><button type="button" class="badge badge-success" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" class="badge badge-danger" @onclick="@(async () => await ChangeImpactsProcess(w.IdFour))">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @if (@w.ImpactOthers)
+                                                                            {
+
+                                                                                <td><button type="button" disabled class="badge badge-success">Yes</button></td>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <td><button type="button" disabled class="badge badge-danger">No</button></td>
+                                                                            }
+                                                                        }
+                                                                        <td>@w.Explain</td>
+                                                                        @if (General.Status != "Approved" && General.Status != "Closed")
+                                                                        {
+                                                                            <td><span @onclick="@(async () => await MarkAsDeleted(w.IdFour))" class="oi oi-trash border-info text-danger icon" aria-hidden="true"></span></td>
+                                                                        }
+                                                                    </tr>
+                                                                    }
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>                              
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                @if (General.Status == "Approved" ||General.Status == "Closed")
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+
+        </div>
+    </EditForm>
+</div>
+@code {
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    Dfour d4 = new Dfour();
+    [Parameter]
+    public string IdCar { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+    public IEnumerable<Dfour> GetOWhys { get; set; }
+    public IEnumerable<Dfour> GetEWhys { get; set; }
+    public IEnumerable<Dfour> GetSWhys { get; set; }
+    public IEnumerable<Dfour> GetORootCauses { get; set; }
+    public IEnumerable<Dfour> GetERootCauses { get; set; }
+    public IEnumerable<Dfour> GetSRootCauses { get; set; }
+    public List<string> rootcauses { get; set; }
+    public bool hide { get; set; } = true;
+    public bool hidediv { get; set; } = true;
+    public bool required { get; set; } = false;
+    Dtwo problem = new Dtwo();
+    GeneralInformation General = new GeneralInformation();
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        d4.LastModifiedBy = loggedInUser;
+        d4.GeneralInformartionId = CarIdNumber;
+        if(d4.IdFour > 0)
+        {
+            db.Update(d4);
+        }
+        else
+        {
+            db.Dfour.Add(d4);
+        }
+
+
+        try
+        {
+            await db.SaveChangesAsync();
+            await Task.WhenAll(Task.Run(() => GetInitialData()));
+            AlertShow("success",$"D4 saved correctly.");
+            d4 = new Dfour();
+            CheckChanged();
+            d4.CreatedBy = loggedInUser;
+            hide = false;
+            hidediv = true;
+            required = false;
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        d4.Created = DateTime.Now;
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        d4.CreatedBy = loggedInUser;
+        await Task.WhenAll(Task.Run(()=> GetInitialData()));
+        if (GetOWhys.Count() > 0 || GetEWhys.Count() > 0 || GetSWhys.Count() > 0)
+        {
+
+            hide = false;
+        }
+
+    }
+    protected async Task GetInitialData()
+    {
+        GetResponsibles = await Responsibles();
+        GetOWhys = await OWhys();
+        GetEWhys = await EWhys();
+        GetSWhys = await SWhys();
+        GetORootCauses = await ORcs();
+        GetERootCauses = await ERcs();
+        GetSRootCauses = await SRcs();
+        problem = await GetProblemDescription();
+        General = new GeneralInformation();
+        General = await GetGeneralInformation();
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    public async Task<List<AspNetUsers>> Responsibles()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    public async Task<List<Dfour>> OWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Ocurrence").ToListAsync();
+    }
+    public async Task<List<Dfour>> EWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Escape").ToListAsync();
+    }
+    public async Task<List<Dfour>> SWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Systemic").ToListAsync();
+    }
+    public async Task<List<Dfour>> ORcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Ocurrence").ToListAsync();
+    }
+    public async Task<List<Dfour>> ERcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Escape").ToListAsync();
+    }
+    public async Task<List<Dfour>> SRcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Systemic").ToListAsync();
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var action = await db.Dfour.FirstOrDefaultAsync(x => x.IdFour == id);
+            action.IsDeleted = true;
+            action.DeletedBy = loggedInUser;
+            action.DeletedOn = DateTime.Now;
+            db.Dfour.Update(action);
+            var deleted = await db.SaveChangesAsync();
+            if (deleted > 0)
+            {
+                await js.InvokeAsync<Task>("alert", "Deleted succesfully!");
+            }
+            GetOWhys = await OWhys();
+            GetEWhys = await EWhys();
+            GetSWhys = await SWhys();
+            GetORootCauses = await ORcs();
+            GetERootCauses = await ERcs();
+            GetSRootCauses = await SRcs();
+        }
+    }
+    protected async Task MarkAsRootCause(int id)
+    {
+
+        var why = await db.Dfour.FirstOrDefaultAsync(x => x.IsDeleted == false && x.IdFour == id);
+        why.IsRootCause = !why.IsRootCause;
+        db.Update(why);
+        await db.SaveChangesAsync();
+        await Task.WhenAll(Task.Run(() => GetRcs()));
+
+    }
+    protected async Task ChangeImpactsProcess(int id)
+    {
+
+        var why = await db.Dfour.FirstOrDefaultAsync(x => x.IsDeleted == false && x.IdFour == id);
+        why.ImpactOthers = !why.ImpactOthers;
+        if(why.ImpactOthers == false)
+        {
+            why.Explain = null;
+            db.Update(why);
+            await db.SaveChangesAsync();
+            await Task.WhenAll(Task.Run(() => GetRcs()));
+        }
+        else
+        {
+            d4 = why;
+            hidediv = false;
+            required = true;
+        }
+    }
+    protected async Task GetRcs()
+    {
+        GetORootCauses = await ORcs();
+        GetERootCauses = await ERcs();
+        GetSRootCauses = await SRcs();
+    }
+    protected void CheckChanged()
+    {
+        hidediv = !hidediv;
+        required = !required;
+    }
+    protected async Task<Dtwo> GetProblemDescription()
+    {
+        return await db.Dtwo.FirstOrDefaultAsync(x => x.IsDeleted == false && x.GeneralInformartionId == CarIdNumber);
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+}

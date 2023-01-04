@@ -1,0 +1,229 @@
+﻿@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+    <div class="container">
+        <div class="modal fade show" id="myModal" style="display:block;background-color: rgba(10,10,10,.8);"
+             aria-modal="true" role="dialog">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">@Title</h4>
+                        <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+                    </div>
+                    <EditForm Model="@d3" OnValidSubmit="@SaveGeneralInformation" class="">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />                       
+                        <div class="form-group card">
+                            <div class="alert alert-primary text-center col-md-8" role="alert">
+                                Provide information on the work done for the task. Include any comment and documentation as evidence of work!
+                            </div>
+                            <div class="card-header">
+                                <h3 class="mb-3 ">Containment Action Information:</h3>
+                            </div>
+                            <div class="card-body" style="overflow-y: auto; max-height: 400px; ">
+                                <div class="form-row">
+                                    @if (d3.IdDthree != 0)
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-striped table-sm small">
+                                                <thead class="thead-light">
+                                                    <tr>
+                                                        <th>Task Owner</th>
+                                                        <th>Task Due Date</th>
+                                                        <th>Task Detail</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>@d3.ResponsibleNavigation.NormalizedUserName</td>
+                                                        <td>@d3.DueDate.ToShortDateString()</td>
+                                                        <td colspan="3">@d3.Action</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+
+                                    <div class="form-group col-sm-12 col-md-12">
+                                        <label>Comment:</label>
+
+                                        <InputTextArea @bind-Value="d3.Comment" disabled="@OnlyView" rows="4" class="form-control" placeholder="Information on the work done for the task." />
+                                    </div>
+                                    <div class="form-group col-sm-12 col-md-12" hidden="@hideFileUploadButton">
+                                        <InputFile OnChange="HandleFileSelected" />
+                                    </div>
+                                    @if (!String.IsNullOrEmpty(d3.Evidence))
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-striped table-sm small">
+                                                <thead class="thead-light">
+                                                    <tr>
+                                                        <th colspan="2">Evidence</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td colspan="2">
+                                                            <img class="img img-thumbnail" src="/Upload/@d3.GeneralInformartion.CapaNumber/CONTAINMENT/@d3.IdDthree.ToString()/@d3.Evidence" />
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="card-footer" hidden="@hideFileUploadButton">
+                                <button type="submit" class="btn btn-primary bn-sm float-right">Mark as Complete</button>
+                            </div>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    @code {
+        IFileListEntry file;
+        public bool IsReadOnly { get; set; } = false;
+        public bool PictureDialogOpen { get; set; }
+        protected string FilePaths { get; set; }
+        private readonly IWebHostEnvironment _environment;
+        QAD_QMSContext db = new QAD_QMSContext();
+        Dthree d3 { get; set; } = new Dthree();
+        [Parameter]
+        public string Title { get; set; }
+        [Parameter]
+        public string Text { get; set; }
+        [Parameter]
+        public EventCallback<bool> OnClose { get; set; }
+        [Parameter]
+        public string IdContainment { get; set; }
+        public bool hideFileUploadButton { get; set; } = false;
+        public int IdContainmentNumber { get; set; }
+        public string CarIdNumber { get; set; }
+        public string loggedInUser { get; set; }
+        public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+        public bool hide { get; set; } = true;
+        public bool OnlyView { get; set; } = false;
+
+
+        public async Task SaveGeneralInformation()
+        {
+            d3.LastModifiedBy = loggedInUser;
+            d3.LastModifiedOn = DateTime.Now;
+            d3.Status = "Pending Verification";
+            d3.EffectivenessVerificationStatusOne = "Pending";
+            d3.EffectivenessVerifiedByOne = loggedInUser;
+            d3.EffectivenessVerifiedOnOne = DateTime.Now;
+            d3.EffectivenessVerificationStatusTwo = "Pending";
+            d3.MarkedAsCompleted = DateTime.Now;
+            db.Update(d3);
+            try
+            {
+                await db.SaveChangesAsync();
+                d3 = await Action();
+                await js.InvokeAsync<Task>("alert", $"Action saved correctly.");
+                await ModalOk();
+                @* hide = false; *@
+                GetLoggedInUser();
+            }
+            catch (Exception ex)
+            {
+                ex.InnerException.ToString();
+                ex.Message.ToString();
+            }
+        }
+        protected override async Task OnInitializedAsync()
+        {
+            if (string.IsNullOrEmpty(IdContainment))
+            {
+                IdContainmentNumber = 0;
+            }
+            else
+            {
+                IdContainmentNumber = Convert.ToInt32(IdContainment);
+            }
+            if (IdContainmentNumber != 0)
+            {
+                await GetInitialData();
+
+                if (d3 != null)
+                {
+                    CarIdNumber = d3.GeneralInformartionId.ToString();
+                    hide = false;
+                }
+            }
+            if (d3 != null)
+            {
+                string id = d3.GeneralInformartionId.ToString();
+                string path = "CAPA" + id + "/" + "CONTAINMENT" + "/" + IdContainment;
+                if (d3.Evidence == null)
+                {
+                    fileUpload.DeleteFileWhenNotSaved(path);
+                }
+            }
+            GetLoggedInUser();
+        }
+        protected async Task GetInitialData()
+        {
+            d3 = await Action();
+        }
+        protected void navigate()
+        {
+            NavigationManager.NavigateTo($"/implementation");
+        }
+        public async Task<Dthree> Action()
+        {
+            d3 = await db.Dthree.Include(x => x.ResponsibleNavigation).Include(x => x.GeneralInformartion).FirstOrDefaultAsync(x => x.IdDthree == IdContainmentNumber);
+            if(d3.Status != "Open")
+            {
+                OnlyView = true;
+                hideFileUploadButton = true;
+            }
+            return d3;
+        }
+        private void GetLoggedInUser()
+        {
+            var principal = HttpContextAccessor.HttpContext.User;
+            loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        }
+        private Task ModalOk()
+        {
+            return OnClose.InvokeAsync(true);
+        }
+        private Task ModalCancel()
+        {
+            return OnClose.InvokeAsync(false);
+        }
+        protected async Task HandleFileSelected(IFileListEntry[] files)
+        {
+            var isSaved = await db.Dthree.FirstOrDefaultAsync(x => x.IdDthree == d3.IdDthree);
+            if (isSaved == null)
+            {
+                await js.InvokeAsync<Task>("alert", "Task Must be saved before adding Images");
+                return;
+            }
+            foreach (var f in files)
+            {
+                d3.Evidence = f.Name;
+                string path = "CAPA" + d3.GeneralInformartionId.ToString() + "/" + "CONTAINMENT" + "/" + IdContainment;
+                fileUpload.DeleteFileWhenNotSaved(path);
+                if (f != null)
+                {
+                    string id = d3.GeneralInformartionId.ToString();
+                    await fileUpload.UploadAsync(f, "CAPA" + id + "/CONTAINMENT/" + IdContainment + "/");
+                }
+            }
+
+        }
+    }

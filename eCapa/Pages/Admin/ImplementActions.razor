@@ -1,0 +1,198 @@
+﻿@page "/Admin/action/{IdAction}"
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IWebHostEnvironment environment
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+    <EditForm Model="@d5" OnValidSubmit="@SaveGeneralInformation" class="">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="alert alert-primary" role="alert">
+            Provide information on the work done for the task. Include any comment and documentation as evidence of work!
+        </div>
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">Containment Action Information:</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    @if (d5.IdFive != 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-sm small">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Task Owner</th>
+                                        <th>Task Due Date</th>
+                                        <th>Task Detail</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>@d5.OwnerNavigation.NormalizedUserName</td>
+                                        <td>@d5.DueDate.ToShortDateString()</td>
+                                        <td colspan="3">@d5.Action</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    <div class="form-group col-sm-12 col-md-12">
+                        <label>Comment:</label>
+                        
+                        <InputTextArea @bind-Value="d5.Comment" rows="4" class="form-control" placeholder="Information on the work done for the task." />
+                    </div>
+                    <div class="form-group col-sm-12 col-md-12">
+                        <InputFile OnChange="HandleFileSelected" multiple hidden="@hideFileUploadButton" />
+                    </div>
+                    @if (!String.IsNullOrEmpty(d5.Evidence))
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped table-sm small">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th colspan="2">Evidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="2">
+                                            <a href="/Upload/@d5.IdActionPlanNavigation.GeneralInformartion.CapaNumber/@d5.Type.ToUpper()/@d5.IdFive.ToString()/@d5.Evidence" class="ml-4">
+                                                <img class="img-thumbnail" src="/Upload/@d5.IdActionPlanNavigation.GeneralInformartion.CapaNumber/@d5.Type.ToUpper()/@d5.IdFive.ToString()/@d5.Evidence" />
+                                            </a>
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                </div>
+            </div>
+            <div class="card-footer">
+                <button type="submit" class="btn btn-primary bn-sm float-right">Mark as Complete</button>
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to List</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+@code {
+    IFileListEntry file;
+    public bool PictureDialogOpen { get; set; }
+    protected string FilePaths { get; set; }
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    DfiveActions d5 { get; set; } = new DfiveActions();
+    [Parameter]
+    public string IdAction { get; set; }
+    public bool hideFileUploadButton { get; set; } = false;
+    public int IdActionNumber { get; set; }
+    public string CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+    public bool hide { get; set; } = true;
+    public async Task SaveGeneralInformation()
+    {
+        d5.LastModifiedBy = loggedInUser;
+        d5.LastModifiedOn = DateTime.Now;
+        d5.Status = "Pending Verification";
+        d5.MarkedAsCompleted = DateTime.Now;
+        db.Update(d5);
+        try
+        {
+            await db.SaveChangesAsync();
+            d5 = await Action();
+            await js.InvokeAsync<Task>("alert", $"D5 saved correctly.");
+            @* hide = false; *@
+        GetLoggedInUser();
+    }
+    catch (Exception ex)
+    {
+        ex.InnerException.ToString();
+        ex.Message.ToString();
+    }
+}
+
+
+protected override async Task OnInitializedAsync()
+{
+    if (string.IsNullOrEmpty(IdAction))
+    {
+        IdActionNumber = 0;
+    }
+    else
+    {
+        IdActionNumber = Convert.ToInt32(IdAction);
+    }
+    if (IdActionNumber != 0)
+    {
+        await GetInitialData();
+
+        if (d5 != null)
+        {
+            CarIdNumber = d5.GeneralInformartionId.ToString();
+            hide = false;
+        }
+    }
+    GetLoggedInUser();
+    if(d5 != null)
+    {
+        string id = d5.GeneralInformartionId.ToString();
+        string path = "CAPA" + id + "/" + d5.Type.ToUpper() + "/" + IdAction;
+        if (d5.Evidence == null)
+        {
+            fileUpload.DeleteFileWhenNotSaved(path);
+        }
+    }
+}
+
+protected async Task GetInitialData()
+{
+    d5 = await Action();
+}
+protected void navigate()
+{
+    NavigationManager.NavigateTo($"/implementation");
+}
+public async Task<DfiveActions> Action()
+{
+    d5 = await db.DfiveActions.Include(x => x.OwnerNavigation).Include(x => x.IdActionPlanNavigation.GeneralInformartion).FirstOrDefaultAsync(x => x.IdFive == IdActionNumber);
+    return d5;
+}
+private void GetLoggedInUser()
+{
+    var principal = HttpContextAccessor.HttpContext.User;
+    loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+}
+
+protected async Task HandleFileSelected(IFileListEntry[] files)
+{
+    var isSaved = await db.DfiveActions.FirstOrDefaultAsync(x => x.IdFive == d5.IdFive);
+    if (isSaved == null)
+    {
+        await js.InvokeAsync<Task>("alert", "Task Must be saved before adding Images");
+        return;
+    }
+    foreach (var f in files)
+    {
+        d5.Evidence = f.Name;
+        string id = d5.GeneralInformartionId.ToString();
+        string path = "CAPA" + id + "/" + d5.Type.ToUpper() + "/" + IdAction;
+        fileUpload.DeleteFileWhenNotSaved(path);
+        if (f != null)
+        {           
+            await fileUpload.UploadAsync(f, "CAPA" + id + "/" + d5.Type.ToUpper() +"/"+ IdAction + "/");
+        }
+    }
+
+}
+}

@@ -1,0 +1,173 @@
+﻿@page "/Admin/DepartmentsList"
+
+@attribute [Authorize(Roles="Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h1 class="ml-2">Departments</h1>
+<div class="container-fluid">
+       <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+      @AlertMessage
+    </div>
+    <EditForm Model="@department"  OnValidSubmit="@SaveGeneralInformation" class="">
+    <DataAnnotationsValidator/>
+    <ValidationSummary/>
+        <div class="form-group card">
+            <div class="card-header">
+                <h3 class="mb-3 ">New Department</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <InputText @bind-Value="department.CreatedBy" hidden class="form-control" placeholder="Created By"/>
+                    <InputDate @bind-Value="department.Created" hidden class="form-control" placeholder="Date Created"/>                                
+                </div>
+                 <div class="form-row">                             
+                    <div class="form-group col-sm-12 col-md-4">
+                        <InputText @bind-Value="department.DepartmentName" class="form-control" placeholder="Department Name"/>
+                    </div>                    
+                </div>               
+            </div> 
+            <div class="card-footer">
+                <button type="submit" class="btn btn-success mr-2 btn-sm">Save</button>
+                <button type="button" class="btn btn-danger btn-sm" @onclick="@(() => Clear())">Cancel</button>
+            </div>
+        </div>
+    </EditForm>
+    <h3 class="mb-3 ">Department List</h3>
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Department Name</th>
+                <AuthorizeView Roles="Admin, SuperAdmin">
+                    <th colspan="2">Actions</th>
+                </AuthorizeView>
+            </tr>
+        </thead>
+        <tbody>
+           @if(DepartmentList == null)
+            {
+                <tr>
+                    <td colspan="2">Loading...</td>
+                </tr>
+            }
+            else if(DepartmentList.Count() == 0)
+            {
+                <tr>
+                    <td colspan="2">No departments registered!</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var d in DepartmentList)
+                {
+                    <tr>
+                        <td>@d.DepartmentName</td>
+                        <AuthorizeView Roles="Admin, SuperAdmin">
+                            <td>
+                                <a href="/Admin/MapProcess/@d.DepartmentId" class="btn btn-primary btn-sm">Map</a>
+                                <button class="btn btn-primary btn-sm" @onclick="@(async () => await ToEdit(d.DepartmentId))">Edit</button>
+                                <button class="btn btn-danger btn-sm" @onclick="@(async () => await MarkAsDeleted(d.DepartmentId))">Delete</button>
+                            </td>
+                        </AuthorizeView>
+                    </tr>    
+                }
+            }
+           
+        </tbody>
+    </table>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    DDepartment department = new DDepartment();
+    private string loggedInUser = string.Empty;
+    private IEnumerable<DDepartment> DepartmentList { get; set; }
+    public bool HideAlert  { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } ="danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    private async Task SaveGeneralInformation()
+    {
+        try
+        {
+            department.LastModifiedBy = loggedInUser;
+            if(department.DepartmentId == 0)
+            {
+                db.DDepartment.Add(department);
+            }
+            else
+            {
+                department.LastModifiedBy = loggedInUser;
+                department.LastModifiedOn = DateTime.Now;
+                db.DDepartment.Update(department);
+            }
+            await db.SaveChangesAsync();
+            AlertShow("success", $"Department Saved!");
+            DepartmentList = await GetDepartmentsList();
+            department = new DDepartment();
+            setUser();
+        }
+        catch(Exception ex)
+        {
+            AlertShow("danger",$"There was an error saving:{ex.InnerException.ToString()}");
+            return;
+        }
+    }
+    protected void Clear()
+    {
+        department = new DDepartment();
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        setUser();
+        DepartmentList = await GetDepartmentsList();
+    }
+    public void setUser()
+    {
+        department.Created = DateTime.Now;
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        department.CreatedBy = loggedInUser;
+    }
+    public async Task<IEnumerable<DDepartment>> GetDepartmentsList()
+    {
+        return await db.DDepartment.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var department = await db.DDepartment.FirstOrDefaultAsync(x => x.DepartmentId == id);
+            department.DeletedBy = loggedInUser;
+            department.DeletedOn = DateTime.Now;
+            department.LastModifiedBy = loggedInUser;
+            department.LastModifiedOn = DateTime.Now;
+            department.IsDeleted = true;
+            db.DDepartment.Update(department);
+            await db.SaveChangesAsync();
+            DepartmentList = await GetDepartmentsList();
+            department = new DDepartment();
+            setUser();
+        }
+
+    }
+    protected async Task ToEdit(int id)
+    {
+        department = await db.DDepartment.FirstOrDefaultAsync(x => x.DepartmentId == id);
+    }
+}

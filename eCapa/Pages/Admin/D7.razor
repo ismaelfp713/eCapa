@@ -1,0 +1,347 @@
+﻿@page "/Admin/d7/{IdCar}"
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http
+@using eCapa.Services
+@using BlazorInputFile
+
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+@inject IFileUpload fileUpload
+
+<div class="container-fluid">
+    <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+            ×
+        </button>
+        @AlertMessage
+    </div>
+    <EditForm Model="@d7" OnValidSubmit="@SaveGeneralInformation" class="">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-3">D7 – Preventive Actions</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-12 col-md-12 col-lg-12">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+                        <InputText @bind-Value="IdCar" hidden readonly="true" class="form-control" placeholder="CAR Number" />
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-primary" role="alert">
+                            Preventive process securing measures to prevent re-ocurrence / Lessons learned (Attach/Add evidence: records).
+                        </div>
+                        <div class="form-row">
+                            <InputText @bind-Value="d7.CreatedBy" hidden class="form-control" placeholder="Created By" />
+                            <InputDate @bind-Value="d7.Created" hidden class="form-control" placeholder="Date Created" />
+                            <div class="form-group col-12 col-sm-12 col-md-4">
+                                <label>Task Owner:</label>
+                                <InputSelect @bind-Value="@d7.Owner" class="form-control">
+                                    <option selected disabled value="">Select Owner</option>
+                                    @if (GetResponsibles != null)
+                                    {
+                                        foreach (var owner in GetResponsibles)
+                                        {
+                                            <option value="@owner.Id">@owner.NormalizedUserName</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <option value="">No Records Found</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="form-group col-12 col-sm-12 col-md-4">
+                                <label>Task Due Date:</label>
+                                <InputDate @bind-Value="@d7.DueDate" class="form-control" />
+                            </div>
+                            <div class="form-group col-sm-12 col-md-12">
+                                <label>Task Detail:</label>
+                                <InputTextArea @bind-Value="@d7.Action" rows="4" class="form-control" required="true" placeholder="Description of the task to be perfomed" />
+                            </div>
+                            <div class="col-md-12">
+                                <div class="row">
+                                    <div class="col-12 col-sm-12 col-md-12">
+                                        @if (d7Actions != null)
+                                        {
+                                            @if (d7Actions.Count() > 0)
+                                            {
+                                                <div class="table-responsive">
+                                                    <table class="table table-bordered table-striped table-sm small">
+                                                        <thead class="thead-light">
+                                                            <tr>
+                                                                <th hidden>Task Id</th>
+                                                                <th>Action</th>
+                                                                <th>Task Owner</th>
+                                                                <th>Task Due Date</th>
+                                                                <th>Status</th>
+                                                                <th class="text-center">Actions</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @foreach (var w in d7Actions)
+                                                            {
+                                                                <tr>
+                                                                    <td hidden>@(w.IdSeven)</td>
+                                                                    <td>@w.Action</td>
+                                                                    <td>@w.OwnerNavigation.NormalizedUserName.Substring(0, @w.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
+                                                                    <td>@w.DueDate.ToShortDateString()</td>
+                                                                    <td>@w.Status</td>
+                                                                    <td class="text-center" colspan="2">
+                                                                        @if (w.Status == "Open")
+                                                                        {
+                                                                            <span class="oi oi-clipboard border-info text-info icon" @onclick="(()=> OpenActionDialog(w.IdSeven.ToString()))" aria-hidden="true"></span>
+                                                                        }
+                                                                        @if (w.Status == "Pending Verification")
+                                                                        {
+                                                                            <span class="oi oi-dial border-info text-info icon" @onclick="(()=> OpenActionValidateDialog(w.IdSeven.ToString()))" aria-hidden="true"></span>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <span disabled class="oi oi-lock-locked border-info text-danger icon" aria-hidden="true"></span>
+                                                                        }
+                                                                        @if (w.Status != "Closed" && w.GeneralInformartion.Owner == loggedInUser)
+                                                                        {
+                                                                            <span @onclick="@(async () => await MarkAsDeleted(w.IdSeven))" class="oi oi-trash border-info text-danger icon" aria-hidden="true"></span>
+                                                                        }
+
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                <div>
+
+
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+            <div class="card-footer">
+
+                @if (General.Status == "Closed")
+                {
+                    <button type="button" disabled class="btn btn-success bn-sm float-right">Save</button>
+                }
+                else
+                {
+                    <button type="submit" class="btn btn-success bn-sm float-right">Save</button>
+                }
+                <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+            </div>
+        </div>
+    </EditForm>
+</div>
+@if (DeleteDialogOpenActions)
+{
+    <ModalValidateDSeven Title="Delay Task"
+                       IdAction="@idtopass"
+                       OnClose="@OnDeleteDialogActionsClose">
+    </ModalValidateDSeven>
+}
+
+@if (DialogOpenAction)
+{
+    <ModalDSevenImplement Title="Implement Task"
+                           IdAction="@idtopass"
+                           OnClose="@OnDialogActionClose">
+    </ModalDSevenImplement>
+}
+@code {
+    public bool DeleteDialogOpen { get; set; }
+    public bool DeleteDialogOpenActions { get; set; }
+    public bool DialogOpenAction { get; set; }
+    public bool DialogOpenContainment { get; set; }
+    IFileListEntry file;
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    Dseven d7 = new Dseven();
+    GeneralInformation General = new GeneralInformation();
+    [Parameter]
+    public string IdCar { get; set; }
+    private string idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public string loggedInUser { get; set; }
+    public IEnumerable<AspNetUsers> GetResponsibles { get; set; }
+    public IEnumerable<Dseven> d7Actions { get; set; }
+    public bool hide { get; set; } = true;
+    public bool hidediv { get; set; } = false;
+    public bool required { get; set; } = true;
+    Dtwo problem = new Dtwo();
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public DateTime dueDate { get; set; }
+    public string AlertType { get; set; } = "danger";
+    public string Type { get; set; } = "Preventive";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        d7.GeneralInformartionId = CarIdNumber;
+        d7.DelayRequested = false;
+        d7.DelayCount = 0;
+        d7.Created = DateTime.Now;
+        d7.IsDeleted = false;
+        d7.LastModifiedBy = loggedInUser;
+        d7.LastModifiedOn = DateTime.Now;
+        var actions = await db.Dseven.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false).ToListAsync();
+        if (d7.IdSeven == 0)
+        {
+
+            if (d7.DueDate < DateTime.Today)
+            {
+                dueDate = d7.DueDate;
+                AlertShow("danger", "Due Date Cannot be in the past!");
+                return;
+            }
+            db.Dseven.Add(d7);
+        }
+        else
+        {
+            db.Update(d7);
+        }
+        try
+        {
+            await db.SaveChangesAsync();
+            await Task.WhenAll(Task.Run(() => GetInitialData()));
+            AlertShow("success", $"D7 saved correctly.");
+            await js.InvokeAsync<Task>("alert", $"D7 saved correctly.");
+            d7 = new Dseven();
+            d7.CreatedBy = loggedInUser;
+            d7.Status = "Pending Action Plan Approval";
+            d7.DueDate = DateTime.Now;
+            hide = false;
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CarIdNumber = Convert.ToInt32(IdCar);
+        IdCar = $"CAPA{IdCar}";
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        d7.DueDate = DateTime.Now;
+        d7.CreatedBy = loggedInUser;
+        d7.Status = "Open";
+        d7.Type = Type;
+        await Task.WhenAll(Task.Run(() => GetInitialData()));
+        if (d7Actions.Count() > 0)
+        {
+            hide = false;
+        }
+    }
+    protected async Task GetInitialData()
+    {
+        GetResponsibles = await Responsibles();
+        d7Actions = await GetActions();
+        General = await GetGeneralInformation();
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{CarIdNumber.ToString()}");
+    }
+    public async Task<List<AspNetUsers>> Responsibles()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    public async Task<List<Dseven>> GetActions()
+    {
+        return await db.Dseven
+            .Include
+            (
+                x => x.GeneralInformartion
+            )
+            .Where
+            (
+                x => x.GeneralInformartionId == CarIdNumber &&
+                x.IsDeleted == false
+            )
+            .ToListAsync();
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var act = await db.Dseven.FirstOrDefaultAsync(x => x.IdSeven == id);
+            act.IsDeleted = true;
+            act.DeletedBy = loggedInUser;
+            act.DeletedOn = DateTime.Now;
+            db.Dseven.Update(act);
+            var actions = await db.Dseven.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false).ToListAsync();
+            var deleted = await db.SaveChangesAsync();
+            if (deleted > 0)
+            {
+
+                AlertShow("success", "Deleted succesfully!");
+            }
+            await GetInitialData();
+        }
+    }
+    protected void CheckChanged()
+    {
+        hidediv = !hidediv;
+        required = !required;
+    }
+    protected async Task<GeneralInformation> GetGeneralInformation()
+    {
+        var res = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber);
+        return res;
+    }
+    private async Task OnDialogActionClose()
+    {
+        await Task.Run(() => DialogOpenAction = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/d7/{CarIdNumber.ToString()}", true);
+    }
+    private void OpenActionDialog(string id)
+    {
+        idtopass = id;
+        DialogOpenAction = true;
+        StateHasChanged();
+    }
+    private void OpenActionValidateDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpenActions = true;
+        StateHasChanged();
+    }
+    private async Task OnDialogContainmentClose()
+    {
+        await Task.Run(() => DialogOpenContainment = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/d7/{CarIdNumber.ToString()}", true);
+    }
+    private async Task OnDeleteDialogActionsClose()
+    {
+        await Task.Run(() => DeleteDialogOpenActions = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/d7/{CarIdNumber.ToString()}", true);
+    }
+}

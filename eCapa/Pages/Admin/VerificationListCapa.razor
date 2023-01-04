@@ -1,0 +1,352 @@
+@page "/Admin/verification/{IdCar}"
+@attribute [Authorize]
+@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime js
+
+<AuthorizeView>
+    <div class="card">
+        <div class="card-body">
+            <h1>D6 - Validate Permenant Corrective Actions</h1>
+            <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+                <button type="button" class="close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden="true">
+                    ×
+                </button>
+                @AlertMessage
+            </div>
+            <div hidden>
+                <h3>Immediate Containment Actions</h3>
+                <div class="alert alert-primary" role="alert">
+                    Review the task for proper implementation.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-sm small">
+                        <thead class="thead-light">
+                            <tr>
+                                <th class="text-center">CAPA</th>
+                                <th class="text-center">Action</th>
+                                <th class="text-center">Status</th>
+                                <th class="text-center">Verification Status</th>
+                                <th class="text-center">Type</th>
+                                <th class="text-center">Due Date</th>
+                                <th class="text-center">Verification Due Date</th>
+                                <th class="text-center">Owner Delays Requested</th>
+                                <th>Owner</th>
+                                <th class="text-center">Verify</th>
+                                <th class="text-center">Delay</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+
+                            @if (ContainmentList != null)
+                            {
+                                if (ContainmentList.Count() == 0)
+                                {
+                                    <tr><td colspan="9">No tasks pending</td></tr>
+                                }
+                                foreach (var c in ContainmentList)
+                                {
+                        <tr>
+                            <td class="text-center">@c.GeneralInformartion.CapaNumber</td>
+                            <td>@c.Action</td>
+                            <td class="text-center">@c.Status</td>
+                            <td class="text-center">@c.EffectivenessVerificationStatusOne</td>
+                            <td class="text-center">Containment</td>
+                            <td class="text-center">@c.DueDate.ToShortDateString()</td>
+                            <td class="text-center">@c.EffectivenessVerificationDateOne?.ToShortDateString()</td>
+                            <td class="text-center">@c.DelayCount</td>
+                            <td class="text-center"><span @onclick="@(()=> OpenContainmentDialog(c.IdDthree.ToString()))" class="oi oi-dial border-info text-info icon" aria-hidden="true"></span></td>
+                            @if (c.EffectivenessVerificationDelayRequestedOne == true)
+                            {
+                                <td class="text-center"><span disabled class="oi oi-lock-locked border-info text-danger icon" aria-hidden="true"></span></td>
+                            }
+                            else
+                            {
+                                <td class="text-center"><span @onclick="@(()=> Alert(c))" class="oi oi-clock border-info text-danger icon" aria-hidden="true"></span></td>
+                            }
+
+                        </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card mt-2">
+        <div class="card-body">          
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped table-sm small">
+                    <thead class="thead-light">
+                        <tr>
+                            <th class="text-center">CAPA</th>
+                            <th class="text-center">Action</th>
+                            <th>Owner</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Type</th>
+                            <th class="text-center">Due Date</th>
+                            <th class="text-center">Verification Due</th>
+                            <th class="text-center">Verification Status</th>
+                            <th class="text-center">Owner Delays</th>
+                            <th class="text-center">Verification Delayed</th>
+                            <th class="text-center">Verification Delayed Request</th>
+                            <th class="text-center">Verification Date</th>
+                            <th class="text-center">Verified?</th>
+                            <th class="text-center">Delay</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (TaskList != null)
+                        {
+                            if (TaskList.Count() == 0)
+                            {
+                                <tr>
+                                    <td colspan="9">No tasks pending</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var a in TaskList)
+                                {
+                    <tr>
+                        <td class="text-center">@a.IdActionPlanNavigation.GeneralInformartion.CapaNumber</td>
+                        <td>@a.Action</td>
+                        <td>@a.OwnerNavigation.NormalizedUserName.Substring(0, a.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
+                        <td class="text-center">@a.Status</td>
+
+                        <td class="text-center">@a.Type</td>
+                        <td class="text-center">@a.DueDate.ToShortDateString()</td>
+                        <td class="text-center">@a.EffectivenessVerificationDateOne?.ToShortDateString()</td>
+                        <td class="text-center">@a.EffectivenessVerificationStatusOne</td>
+                        <td class="text-center">@a.DelayCount</td>
+                        @if (a.EffectivenessVerificationDelayRequestedOne == true)
+                        {
+                            <td class="text-center">Yes</td>
+                        }
+                        else
+                        {
+                            <td class="text-center">No</td>
+                        }
+                        @if (a.EffectivenessVerificationDelayRequestedOnOne != null)
+                        {
+                            <td class="text-center">@a.EffectivenessVerificationDelayRequestedOnOne</td>
+                        }
+                        else
+                        {
+                            <td></td>
+                        }
+                        <td>@a.EffectivenessVerifiedOnOne?.ToShortDateString()</td>
+
+                        @if (a.EffectivenessVerificationStatusOne == "Approved")
+                        {
+                            <td class="text-center"><span disabled class="oi oi-check border-info text-success icon" aria-hidden="true"></span></td>
+                        }
+                        else
+                        {
+                            <td class="text-center"><span class="oi oi-dial border-info text-info icon" @onclick="@(()=> OpenActionDialog(a.IdFive.ToString()))" aria-hidden="true"></span></td>
+                        }
+                        @if (a.EffectivenessVerificationDelayRequestedOne == true || a.Status == "Closed")
+                        {
+                            <td class="text-center"><span disabled class="oi oi-lock-locked border-info text-danger icon" aria-hidden="true"></span></td>
+
+                        }
+                        else
+                        {
+                            <td class="text-center"><span @onclick="@(()=> AlertActions(a))" class="oi oi-clock border-info text-danger icon" aria-hidden="true"></span></td>
+                        }
+                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">           
+            <button type="button" class="btn btn-info  bn-sm float-left" @onclick="@(() => navigate())">Back to Main</button>
+        </div>
+    </div>
+    @if (DeleteDialogOpen)
+    {
+        <ModalDelayContainment Title="Delay Task"
+                               IdContainment="@idtopass"
+                               OnClose="@OnDeleteDialogClose">
+        </ModalDelayContainment>
+    }
+    @if (DeleteDialogOpenActions)
+    {
+        <ModalDelayVerification Title="Delay Verification"
+                                IdAction="@idtopass"
+                                OnClose="@OnDeleteDialogActionsClose">
+        </ModalDelayVerification>
+    }
+
+    @if (DialogOpenContainment)
+    {
+        <ModalContainmentValidate Title="Verification of Implementation:"
+                                   IdContainment="@idtopass"
+                                   OnClose="@OnDialogContainmentClose">
+        </ModalContainmentValidate>
+    }
+    @if (DialogOpenAction)
+    {
+        <ModalActionValidate Title="Task Information:"
+                                   IdAction="@idtopass"
+                                   OnClose="@OnDialogActionClose">
+        </ModalActionValidate>
+    }
+</AuthorizeView>
+
+@code{
+    public bool DeleteDialogOpen { get; set; }
+    public bool DeleteDialogOpenActions { get; set; }
+    public bool DialogOpenContainment { get; set; }
+    public bool DialogOpenAction { get; set; }
+    private readonly IWebHostEnvironment _environment;
+    QAD_QMSContext db = new QAD_QMSContext();
+    public IEnumerable<DfiveActions> TaskList { get; set; }
+    public IEnumerable<Dthree> ContainmentList { get; set; }
+    private string idtopass{ get; set; }
+    public string loggedInUser { get; set; }
+    public int CapaId { get; set; }
+    [Parameter]
+    public string IdCar { get; set; }
+    public bool HideAlert { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } = "danger";
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        CapaId = String.IsNullOrEmpty(IdCar) ? 0 : Convert.ToInt32(IdCar);
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        await Task.WhenAll(Task.Run(() => GetInitialData()));
+    }
+    protected async Task GetInitialData()
+    {
+        ContainmentList = new  List<Dthree>();
+        ContainmentList = await GetContainmentTasks();
+        TaskList = new List<DfiveActions>();
+        TaskList = await GetTasks();
+    }
+    protected async Task<IEnumerable<DfiveActions>> GetTasks()
+    {
+        TaskList = await db.DfiveActions.Where
+        (
+            x => x.Owner == loggedInUser &&
+            x.IsDeleted == false &&
+            x.GeneralInformartionId == CapaId &&
+            x.Status == "Pending Verification" ||
+            x.Status == "Closed"
+        )
+        .Include(x => x.IdActionPlanNavigation).ThenInclude(x => x.GeneralInformartion).ThenInclude(x => x.CreatedByNavigation)
+        .Include(x => x.OwnerNavigation)        
+        .ToListAsync();
+        return TaskList;
+    }
+    protected async Task<IEnumerable<Dthree>> GetContainmentTasks()
+    {
+        ContainmentList = await db.Dthree.Where
+        (
+            x => x.Responsible == loggedInUser &&
+            x.IsDeleted == false &&
+            x.Status == "Pending Verification" &&
+            x.GeneralInformartionId == CapaId
+        )
+        .Include(x => x.CreatedByNavigation)
+        .Include(x => x.GeneralInformartion)
+        .ToListAsync();
+        return ContainmentList;
+    }
+    protected void navigate()
+    {
+        NavigationManager.NavigateTo($"/Admin/general/{IdCar}");
+    }
+    protected void Alert(Dthree containment)
+    {
+        if(containment.DelayCount >= 3)
+        {
+            AlertShow("danger", "Cannot delay this action, it has been delayed the 3 times permitted!");
+            return;
+        }
+        else
+        {
+            OpenDeleteDialog(containment.IdDthree.ToString());
+        }
+    }
+    protected void AlertActions(DfiveActions actions)
+    {
+        if(actions.DelayCount >= 3)
+        {
+            AlertShow("danger", "Cannot delay this action, it has been delayed the 3 times permitted!");
+            return;
+        }
+        else
+        {
+            OpenDeleteActionsDialog(actions.IdFive.ToString());
+        }
+    }
+    private async Task OnDeleteDialogClose()
+    {
+        await Task.Run(()=>DeleteDialogOpen = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/verification/{CapaId}", true);
+    }
+    private void OpenDeleteDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpen = true;
+        StateHasChanged();
+    }
+    private async Task OnDeleteDialogActionsClose()
+    {
+        await Task.Run(()=>DeleteDialogOpenActions = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/verification/{CapaId}", true);
+    }
+    private void OpenDeleteActionsDialog(string id)
+    {
+        idtopass = id;
+        DeleteDialogOpenActions = true;
+        StateHasChanged();
+    }
+    private async Task OnDialogContainmentClose()
+    {
+        await Task.Run(() => DialogOpenContainment = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/verification/{CapaId}", true);
+    }
+    private void OpenContainmentDialog(string id)
+    {
+        idtopass = id;
+        DialogOpenContainment = true;
+        StateHasChanged();
+    }
+    private async Task OnDialogActionClose()
+    {
+        await Task.Run(() => DialogOpenAction = false);
+        StateHasChanged();
+        NavigationManager.NavigateTo($"/Admin/verification/{CapaId}", true);
+    }
+    private void OpenActionDialog(string id)
+    {
+        idtopass = id;
+        DialogOpenAction = true;
+        StateHasChanged();
+    }
+
+}
+

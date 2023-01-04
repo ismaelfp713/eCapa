@@ -1,0 +1,152 @@
+@attribute [Authorize(Roles = "Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);"
+     aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">@Title</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>            
+            <EditForm Model="@containment" class="">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                @if (containment != null)
+                {
+                    <div class="modal-body">
+                        <div class="alert alert-warning" role="alert">
+                            Provide a new Due Date for the task to be completed. Due date can only be modified 3 times.
+                        </div>
+                   
+                        <p>@Text</p>                                              
+                       
+                            @if(loggedInUser == containment.Responsible)
+                            {
+                                <div class="form-group col-md-12">                            
+                                    <label><strong>Due Date:</strong></label>
+                                    <InputDate @bind-Value="containment.DueDate" rows="4" class="form-control"/>
+                                </div>
+                                <div class="form-group col-sm-12 col-md-12">
+                                    <label><strong>Delay Reason:</strong></label>
+                                    <InputTextArea @bind-Value="containment.DelayReason" class="form-control" required placeholder="Reason for requesting a delay" />
+                                    <button type="button" class="btn btn-success mt-2" @onclick="@(async ()=> await DelayContainment())">Delay</button>                                
+                                    <button type="button" class="btn btn-secondary mt-2" @onclick="(async ()=> await ModalCancel())">Cancel</button>
+                                </div>
+                                
+                            }
+                        
+                                                 
+                    </div>                  
+                    <div class="modal-footer text-center alert-@Alert">
+                        @Message
+                    </div>
+                }
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    DProcessRoles processRoles = new DProcessRoles();
+    Dthree containment { get; set; } = new Dthree();
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+    [Parameter]
+    public string IdContainment { get; set; }
+    public int Id { get; set; }
+    public string Message { get; set; }
+    public string loggedInUser { get; set; }
+    public string QaManager { get; set; } = string.Empty;
+    public string DeptManager { get; set; } = string.Empty;
+    public string Alert { get; set; } = "default";
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(IdContainment))
+        {
+            Id = Convert.ToInt32(IdContainment);
+            await Task.WhenAll(Task.Run(() => GetInitialData()));
+        }
+        else
+        {
+            Id = 0;
+        }
+    }
+    protected async Task GetInitialData()
+    {
+        containment = await GetContainment(Id);
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+    }
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+    public async Task DelayContainment()
+    {
+        try
+        {
+            if (Id == 0)
+            {
+                await js.InvokeAsync<Task>("alert", "Cannot delay this action!");
+                Message = "Cannot delay this action!";
+                Alert = "danger";
+                return;
+            }
+            else
+            {
+                var exists = await db.Dthree.FirstOrDefaultAsync(x => x.IdDthree == Id && x.IsDeleted == false);
+                if(exists !=null)
+                {
+                    if(string.IsNullOrEmpty(exists.DelayReason))
+                    {
+                        await js.InvokeAsync<Task>("alert", "Delay reason is required!");
+                        return;
+                    }
+                    if(exists.DelayCount >= 3)
+                    {
+                        await js.InvokeAsync<Task>("alert", "Cannot delay this action, it has been delayed the 3 times permitted!");
+                        await ModalCancel();
+                        return;
+                    }
+                    else
+                    {
+                        exists.DelayRequested = true;
+                        exists.DelayRequestedOn = DateTime.Now;
+                        exists.LastModifiedBy = loggedInUser;
+                        exists.LastModifiedOn = DateTime.Now;
+                        exists.DelayCount = exists.DelayCount+1;
+                        db.Update(exists);
+                    }
+
+                }
+            }
+            await db.SaveChangesAsync();
+            Message = $"Containment Action Delayed!";
+            Alert = "success";
+            await ModalOk();
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected async Task<Dthree> GetContainment(int id)
+    {
+        var containment = await db.Dthree
+            .Include(x => x.GeneralInformartion)
+            .FirstOrDefaultAsync(x => x.IsDeleted == false && x.IdDthree == id);
+        return containment;
+    }
+}

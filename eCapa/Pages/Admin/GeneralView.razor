@@ -1,0 +1,1194 @@
+﻿@page "/Admin/general/{IdCar}"
+@using System.Security.Claims;
+@using Microsoft.AspNetCore.Http
+@attribute [Authorize]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavigationManager
+
+<div class="container-fluid">
+    <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
+        <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
+            ×
+        </button>
+      @AlertMessage
+    </div>
+    <div class="container-fluid mx-auto text-center d-print-none">
+        @if (gen != null)
+        {
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-primary mb-1" @onclick="@(() => navigate("D0"))">Edit Capa</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-secondary mb-1" @onclick="@(() => navigate("D2"))">D2- Problem Description</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-info mb-1" @onclick="@(() => navigate("D3"))">D3 - Containment</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-dark mb-1" @onclick="@(() => navigate("D4"))">D4 - Root Cause</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-primary mb-1" @onclick="@(() => navigate("D5"))">D5 - Action Plan</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-info mb-1" @onclick="@(() => CheckIfSubmittedBefore(CarIdNumber))">Submit Plan Approval</button>
+            <button type="button" hidden="@CanApproveIt" class="btn btn-outline-success mb-1" @onclick="@(async () => OpenDeleteDialog(CarIdNumber))">Plan Approval</button><br/>
+            <button type="button" hidden="@HasTask" class="btn btn-outline-info mb-1" @onclick="@(async () => await navigateImplementation("implementation"))">D6 - Implementation</button>
+            <button type="button" hidden="@CanVerifyIt" class="btn btn-outline-dark mb-1" @onclick="@(async () => await navigatePage("verification"))">D6 - Validation</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-info mb-1" @onclick="@(() => navigate("D7"))">D7 - Preventive Actions</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-dark mb-1" @onclick="@(() => navigate("d7cross"))">D7 - Cross Reference</button>
+            <button type="button" hidden="@CanWorkIt" class="btn btn-outline-success mb-1" @onclick="@(() => navigate("D8"))">D8 - Recognition</button>
+            <button type="button" class="btn btn-outline-primary mb-1"  @onclick="@(() => navigate("Print"))">Print 8D</button>
+        }
+    </div>
+    <div class="form-group card">
+        <div class="card-header">
+            <h3 class="">CAPA Information</h3>
+        </div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="col-12 col-sm-12 col-md-12">
+                    @if (gen == null)
+                    {
+                        <span>Loading....</span>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm small table-bordered">
+                                <tbody>                                    <tr>
+                                        <td><b>CAPA Number:</b> @IdCar</td>
+                                        <td><b>CAPA Type:</b> @gen.Type</td>
+                                        <td><b>Status:</b> @gen.Status</td>
+                                        <td colspan="2"><b>Customer:</b> @customer.CustomerName</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b>Owner:</b> @owner.NormalizedUserName.Substring(0, owner.NormalizedUserName.IndexOf("@"))</td>
+                                        <td><b>Group Manager Approver:</b> @QaManager.NormalizedUserName.Substring(0, QaManager.NormalizedUserName.IndexOf("@"))</td>
+                                        <td><b>Department Manager Approver:</b> @FunctionalApprover.NormalizedUserName.Substring(0, FunctionalApprover.NormalizedUserName.IndexOf("@"))</td>
+                                        <td colspan="2"><b>Verification Approver:</b> @VerificationApprover.NormalizedUserName.Substring(0, VerificationApprover.NormalizedUserName.IndexOf("@"))</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b>Process:</b> @process.ProcessName</td>
+                                        <td><b>Creation Date:</b> @gen.Created.ToShortDateString()</td>
+                                        <td><b>Expected Closure:</b> @gen.ExpectedClosureDate.ToShortDateString()</td>
+                                        <td colspan="2"><b>Closed Date:</b> @gen.ActualClosedDate</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b>Source:</b> @gen.Source</td>
+                                        <td><b>Audit Number:</b> @gen.AuditReportNumber</td>
+                                        <td><b>Standard:</b> @gen.Standard</td>
+                                        <td colspan="2"><b>Severity:</b> @gen.Severity</td>
+                                    </tr>
+                                    <tr>
+                                        <td><b>Clause:</b> @clause.ClauseNumber - @clause.ClauseName</td>
+                                        <td colspan="2"><b>Sub Clause:</b> @subclause.SubClauseNumber - @subclause.SubClauseName</td>
+                                        <td><b>Created By:</b> @createdBy.NormalizedEmail.Substring(0, createdBy.NormalizedUserName.LastIndexOf("@"))</td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="4"><b>Symptom:</b> @gen.Symptom</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+                <div class="col-12 col-sm-12 col-md-12">
+                    <hr />
+                    <h3>Team Members</h3>
+                    <hr />
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm small table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Team Role</th>
+                                    <th>Name</th>
+                                    <th>Phone Number</th>
+                                    <th>Email Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (processAssRoles == null)
+                                {
+                                    <tr>
+                                        <td colspan="4">Loading...</td>
+                                    </tr>
+                                }
+                                else if (processAssRoles.Count() == 0)
+                                {
+                                    <tr>
+                                        <td colspan="4">No team registered!</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var t in processAssRoles)
+                                    {
+                                        <tr>
+                                            <td>@t.Role.RoleName</td>
+                                            <td>@t.User.NormalizedUserName.Substring(0, t.User.NormalizedUserName.IndexOf("@"))</td>
+                                            <td>@t.User.PhoneNumber</td>
+                                            <td>@t.User.NormalizedEmail</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <hr />
+                    <h3>Problem Description </h3>
+                    <hr />
+                    @if (d2 == null)
+                    {
+                        <div class="form-group col-sm-12 col-md-12">
+                            <p>Problem has not been defined</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-12 col-sm-12 col-md-12">
+                            <p>@d2.ProblemStatement</p>
+                        </div>
+                        @foreach (var a in getPictures)
+                        {
+                            <picture><img src="/Upload/@IdCar/@a.Filename" class="img-fluid" /></picture>
+                        }
+                    }
+
+                    <hr />
+                    <h3>Containment Actions </h3>
+                    <hr />
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm small table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th colspan="4">Action</th>
+                                    <th>Responsible</th>
+                                    <th>Commitment Date</th>
+                                    <th>Status</th>
+                                    <th>Implementation Comments</th>
+                                    <th>Evidence</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (ContainmentActions == null)
+                                {
+                                    <tr>
+                                        <td colspan="7">Loading...</td>
+                                    </tr>
+                                }
+                                else if (ContainmentActions.Count() == 0)
+                                {
+
+                                    <tr>
+                                        <td colspan="7">No actions registered!</td>
+                                    </tr>
+                                }
+                                else
+                                {
+
+                                    @foreach (var a in ContainmentActions)
+                                    {
+                                        <tr>
+                                            <td colspan="4">@a.Action</td>
+                                            <td>@a.ResponsibleNavigation.NormalizedUserName</td>
+                                            <td>@a.DueDate.ToShortDateString()</td>
+                                            <td>@a.Status</td>
+                                            <td>@a.Comment</td>
+                                            <td> <picture><img src=@($"/Upload/CAPA{@a.GeneralInformartionId}/CONTAINMENT/{@a.IdDthree}/{@a.Evidence}") class="img-fluid" /></picture></td>
+                                        </tr>
+                                    }
+
+
+                                }
+                            </tbody>
+                        </table>
+
+                        <hr />
+                        <h3>Identify Problem Root Cause</h3>
+                        <hr />
+                        <div class="col-md-12 d-print-inline-block">
+                            <div class="row">
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetORootCauses != null)
+                                    {
+                                        <div class="card">
+                                            <div class="card-header">
+                                                Ocurrence RC Result
+                                            </div>
+
+                                            <ul class="list-group list-group-flush">
+                                                @foreach (var item in GetORootCauses)
+                                                {
+                                                    <li class="list-group-item">@item.Why</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetERootCauses != null)
+                                    {
+                                        <div class="card">
+                                            <div class="card-header">
+                                                Escape RC Result
+                                            </div>
+
+                                            <ul class="list-group list-group-flush">
+                                                @foreach (var item in GetERootCauses)
+                                                {
+                                                    <li class="list-group-item">@item.Why</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetSRootCauses != null)
+                                    {
+                                        <div class="card">
+                                            <div class="card-header">
+                                                Systemic RC Result
+                                            </div>
+
+                                            <ul class="list-group list-group-flush">
+                                                @foreach (var item in GetSRootCauses)
+                                                {
+                                                    <li class="list-group-item">@item.Why</li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetOWhys != null)
+                                    {
+                                        @if (GetOWhys.Count() > 0)
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered table-striped table-sm small">
+                                                    <thead class="thead-light">
+                                                        <tr>
+                                                            <th>Why</th>
+                                                            <th>Type</th>
+                                                            <th>Is Root Cause?</th>
+                                                            <th>Impacts Other Process?</th>
+                                                            <th>Explain</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+
+                                                        @foreach (var w in GetOWhys)
+                                                        {
+                                                            <tr>
+                                                                <td>@w.Why</td>
+                                                                <td>@w.Type</td>
+                                                                @if (@w.IsRootCause)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                @if (@w.ImpactOthers)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                <td>@w.Explain</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetEWhys != null)
+                                    {
+                                        @if (GetEWhys.Count() > 0)
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered table-striped table-sm small">
+                                                    <thead class="thead-light">
+                                                        <tr>
+                                                            <th>Why</th>
+                                                            <th>Type</th>
+                                                            <th>Is Root Cause?</th>
+                                                            <th>Impacts Other Process?</th>
+                                                            <th>Explain</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+
+                                                        @foreach (var w in GetEWhys)
+                                                        {
+                                                            <tr>
+                                                                <td>@w.Why</td>
+                                                                <td>@w.Type</td>
+                                                                @if (@w.IsRootCause)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                @if (@w.ImpactOthers)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                <td>@w.Explain</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    }
+
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-4">
+                                    @if (GetSWhys != null)
+                                    {
+                                        @if (GetSWhys.Count() > 0)
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-bordered table-striped table-sm small">
+                                                    <thead class="thead-light">
+                                                        <tr>
+                                                            <th>Why</th>
+                                                            <th>Type</th>
+                                                            <th>Is Root Cause?</th>
+                                                            <th>Impacts Other Process?</th>
+                                                            <th>Explain</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+
+                                                        @foreach (var w in GetSWhys)
+                                                        {
+                                                            <tr>
+                                                                <td>@w.Why</td>
+                                                                <td>@w.Type</td>
+                                                                @if (@w.IsRootCause)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                @if (@w.ImpactOthers)
+                                                                {
+                                                                    <td><span class="badge badge-success">Yes</span></td>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <td><span class="badge badge-danger">No</span></td>
+                                                                }
+                                                                <td>@w.Explain</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <hr />
+                        <h3>Action Plan Approval</h3>
+                        <hr />
+                        <div class="col-md-12">
+                            <div class="row mt-3">
+                                <div class="col-12 col-sm-12 col-md-12">
+                                    @if (approvals != null)
+                                    {                                        
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-striped table-sm small">
+                                                <thead class="thead-light">
+                                                    <tr>
+                                                        <th hidden>Approval Id</th>
+                                                        <th>Name</th>
+                                                        <th>Status</th>
+                                                        <th>Approval Date</th>
+                                                        <th>Comments</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td hidden>@approvals.IdActionPlan</td>
+                                                        <td>@QaManager.NormalizedUserName</td>
+                                                        <td>@approvals.QaApprovalStatus</td>
+                                                        <td>@approvals.QaApprovedDate?.ToShortDateString()</td>
+                                                        <td>@approvals.QaApproverComment</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td hidden>@approvals.IdActionPlan</td>
+                                                        <td>@FunctionalApprover.NormalizedUserName</td>
+                                                        <td>@approvals.FunctionalApprovalStatus</td>
+                                                        <td>@approvals.FunctionalApprovedDate?.ToShortDateString()</td>
+                                                        <td>@approvals.FunctionalApproverComment</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>                                        
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <hr />
+                        <h3>Permanent Corrective Action Implementation and Validation</h3>
+                        <hr />
+                        <div class="col-md-12">
+                            <div class="row mt-3">
+                                <div class="col-12 col-sm-12 col-md-12">
+                                    <h4>Ocurrence Actions</h4>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-sm small">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th hidden>Task Id</th>
+                                                    <th>Action</th>
+                                                    <th>Task Owner</th>
+                                                    <th>Task Due Date</th>
+                                                    <th>Status</th>
+                                                    <th>Verifier</th>
+                                                    <th>Verification Status</th>
+                                                    <th>Verification Due</th>
+                                                    <th>Verified On</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (OActions is null)
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">Loading...</td>
+                                                    </tr>
+                                                }
+                                                else if (OActions.Count().Equals(0))
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">No actions registered!</td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var w in OActions)
+                                                    {
+                                            <tr>
+                                                <td hidden>@w.IdFive</td>
+                                                <td>@w.Action</td>
+                                                <td>@w.OwnerNavigation.NormalizedUserName.Substring(0, @w.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.DueDate.ToShortDateString()</td>
+                                                <td>@w.Status</td>
+                                                <td>@VerificationApprover.NormalizedUserName.Substring(0, VerificationApprover.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.EffectivenessVerificationStatusOne</td>
+                                                <td>@w.EffectivenessVerificationDateOne?.ToShortDateString()</td>
+                                                <td>@w.EffectivenessVerifiedOnOne?.ToLongDateString()</td>
+                                            </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-12">
+                                    <h4>Escape Actions</h4>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-sm small">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th hidden>Task Id</th>
+                                                    <th>Action</th>
+                                                    <th>Task Owner</th>
+                                                    <th>Task Due Date</th>
+                                                    <th>Status</th>
+                                                    <th>Verifier</th>
+                                                    <th>Verification Status</th>
+                                                    <th>Verification Due</th>
+                                                    <th>Verified On</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (EActions is null)
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">Loading...</td>
+                                                    </tr>
+                                                }
+                                                else if (EActions.Count().Equals(0))
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">No actions registered!</td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var w in EActions)
+                                                    {
+                                            <tr>
+                                                <td hidden>@w.IdFive</td>
+                                                <td>@w.Action</td>
+                                                <td>@w.OwnerNavigation.NormalizedUserName.Substring(0, @w.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.DueDate.ToShortDateString()</td>
+                                                <td>@w.Status</td>
+                                                <td>@VerificationApprover.NormalizedUserName.Substring(0, VerificationApprover.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.EffectivenessVerificationStatusOne</td>
+                                                <td>@w.EffectivenessVerificationDateOne?.ToShortDateString()</td>
+                                                <td>@w.EffectivenessVerifiedOnOne?.ToLongDateString()</td>
+                                            </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-sm-12 col-md-12">
+                                    <h4>Systemic Actions</h4>
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped table-sm small">
+                                            <thead class="thead-light">
+                                                <tr>
+                                                    <th hidden>Task Id</th>
+                                                    <th>Action</th>
+                                                    <th>Task Owner</th>
+                                                    <th>Task Due Date</th>
+                                                    <th>Status</th>
+                                                    <th>Verifier</th>
+                                                    <th>Verification Status</th>
+                                                    <th>Verification Due</th>
+                                                    <th>Verified On</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @if (SActions is null)
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">Loading...</td>
+                                                    </tr>
+                                                }
+                                                else if (SActions.Count().Equals(0))
+                                                {
+                                                    <tr>
+                                                        <td colspan="8">No actions registered!</td>
+                                                    </tr>
+                                                }
+                                                else
+                                                {
+
+                                                    @foreach (var w in SActions)
+                                                    {
+                                            <tr>
+                                                <td hidden>@(w.IdFive)</td>
+                                                <td>@w.Action</td>
+                                                <td>@w.OwnerNavigation.NormalizedUserName.Substring(0, @w.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.DueDate.ToShortDateString()</td>
+                                                <td>@w.Status</td>
+                                                <td>@VerificationApprover.NormalizedUserName.Substring(0, VerificationApprover.NormalizedUserName.LastIndexOf("@"))</td>
+                                                <td>@w.EffectivenessVerificationStatusOne</td>
+                                                <td>@w.EffectivenessVerificationDateOne?.ToShortDateString()</td>
+                                                <td>@w.EffectivenessVerifiedOnOne?.ToLongDateString()</td>
+                                            </tr>
+                                                    }
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>                                   
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-footer float-right">
+        </div>
+    </div>
+    @if (DeleteDialogOpen)
+    {
+        <ModalActionPlanApproval 
+                          Title="Approve/Reject Action Plan"
+                          CapaId="@idtopass.ToString()"                         
+                          OnClose="@OnDeleteDialogClose">
+        </ModalActionPlanApproval>
+    }
+</div>
+
+
+@code {
+    public bool DeleteDialogOpen { get; set; }
+    [Parameter]
+    public string IdCar { get; set; }
+    QAD_QMSContext db = new QAD_QMSContext();
+    GeneralInformation gen { get; set; }
+    Customers customer { get; set; }
+    Dtwo d2 { get; set; }
+    DProcesses process { get; set; }
+    DProcessRoles roles { get; set; }
+    AspNetUsers owner { get; set; }
+    AspNetUsers createdBy { get; set; }
+    AspNetUsers QaManager { get; set; }
+    AspNetUsers FunctionalApprover { get; set; }
+    AspNetUsers VerificationApprover { get; set; }
+    DClauses clause { get; set; }
+    SendEmailClass sendEmail = new SendEmailClass();
+    DSubClauses subclause { get; set; }
+    IEnumerable<DRoles> GetAllRoles { get; set; }
+    IEnumerable<AspNetUsers> GetAllUsers { get; set; }
+    IEnumerable<Dthree> ContainmentActions { get; set; }
+    IEnumerable<DfiveActions> PermanentActions { get; set; }
+    public IEnumerable<Dfour> GetOWhys { get; set; }
+    public IEnumerable<Dfour> GetEWhys { get; set; }
+    public IEnumerable<Dfour> GetSWhys { get; set; }
+    public IEnumerable<Dfour> GetORootCauses { get; set; }
+    public IEnumerable<Dfour> GetERootCauses { get; set; }
+    public IEnumerable<Dfour> GetSRootCauses { get; set; }
+    public IEnumerable<DfiveActions> OActions { get; set; }
+    public IEnumerable<DfiveActions> EActions { get; set; }
+    public IEnumerable<DfiveActions> SActions { get; set; }
+    public string body { get; set; }
+    public bool HasTask { get; set; } = true;
+    public bool CanWorkIt { get; set; } = true;
+    public bool CanApproveIt { get; set; } = true;
+    public bool CanVerifyIt { get; set; } = true;
+    List<DProcessRoles> processAssRoles = new List<DProcessRoles>();
+    List<DtwoPictures> getPictures = new List<DtwoPictures>();
+    List<Dfour> getRootCauses { get; set; }
+    public Dfive approvals { get; set; }
+    public string loggedInUser = string.Empty;
+    private int idtopass { get; set; }
+    public int CarIdNumber { get; set; }
+    public string enabledProblemDescription { get; set; } = "";
+    public string enabledContainment { get; set; } = "disabled";
+    public string enabledRootCause { get; set; } = "disabled";
+    public string enabledActionPlan { get; set; } = "disabled";
+    public string enabledSubmitActionPlan { get; set; } = "disabled";
+    public string enabledPlanApproval { get; set; } = "disabled";
+    public string enabledImplementation { get; set; } = "disabled";
+    public string enabledVerification { get; set; } = "disabled";
+    public bool HideAlert  { get; set; } = true;
+    public string AlertMessage { get; set; } = string.Empty;
+    public string AlertType { get; set; } ="danger";
+    public async Task SaveGeneralInformation()
+    {
+        gen.LastModifiedBy = loggedInUser;
+        if (string.IsNullOrEmpty(IdCar))
+        {
+            db.GeneralInformation.Add(gen);
+        }
+        else
+        {
+            int id = gen.GeneralInformartionId;
+            gen = await db.GeneralInformation.Include(x => x.OwnerNavigation).FirstOrDefaultAsync(x => x.IsDeleted == false && x.GeneralInformartionId == id);
+            db.Update(gen);
+        }
+        try
+        {
+            await db.SaveChangesAsync();
+            IdCar = $"CAPA{gen.GeneralInformartionId.ToString()}";
+            AlertShow("success",$"{IdCar} saved correctly.");
+            NavigationManager.NavigateTo($"/Admin/D2/{gen.GeneralInformartionId.ToString()}");
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(IdCar))
+        {
+            gen.Created = DateTime.Now;
+            var principal = HttpContextAccessor.HttpContext.User;
+            loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+            gen.CreatedBy = loggedInUser;
+        }
+        else
+        {
+            int id = Convert.ToInt32(IdCar);
+            CarIdNumber = id;
+            IdCar = $"CAPA{IdCar}";
+            await Task.WhenAll(Task.Run(() => GetInitialData(id)));
+        }
+    }
+    protected async Task GetInitialData(int id)
+    {
+        GetAllRoles = await AllRoles();
+        GetAllUsers = await GetAllUsersM();
+        gen = await db.GeneralInformation
+        .Include(x => x.OwnerNavigation)
+        .Include(x => x.Dthree)
+        .Include(x => x.Dfive)
+        .ThenInclude(x => x.DfiveActions)
+        .FirstOrDefaultAsync(x => x.GeneralInformartionId == id);
+
+        customer = await db.Customers.FirstOrDefaultAsync(x => x.CustomersId == gen.CustomerId);
+        process = await db.DProcesses.FirstOrDefaultAsync(x => x.ProcessId == gen.ProcessId);
+        roles = await db.DProcessRoles.FirstOrDefaultAsync(x => x.ProcessId == gen.ProcessId && x.RoleId == 5);
+        owner = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.Owner);
+        QaManager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.QaManagerApprover);
+        FunctionalApprover = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.DepartmentApprover);
+        VerificationApprover = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.Verifier);
+        clause = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == gen.Clause);
+        subclause = await db.DSubClauses.FirstOrDefaultAsync(x => x.SubClauseId == gen.SubClause);
+        processAssRoles = await GetProcessRoles(process.ProcessId);
+        createdBy = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.CreatedBy);
+        d2 = await GetD2(id);
+        if (d2 != null)
+        {
+            getPictures = await PicturesList(d2.IdDtwo);
+        }
+        ContainmentActions = await GetAllContainmentActions(id);
+        PermanentActions = await GetAllPermanentActions(id);
+        getRootCauses = await GetAllRootCauses(id);
+        approvals = await GetApprovals();
+        GetOWhys = await OWhys();
+        GetEWhys = await EWhys();
+        GetSWhys = await SWhys();
+        GetORootCauses = await ORcs();
+        GetERootCauses = await ERcs();
+        GetSRootCauses = await SRcs();
+        OActions = await GetOActions();
+        EActions = await GetEActions();
+        SActions = await GetSActions();
+        var principal = HttpContextAccessor.HttpContext.User;
+        var loggedInUserRole = principal.IsInRole("SuperAdmin");
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+
+        if (gen.Owner == loggedInUser || gen.CreatedBy == loggedInUser || loggedInUserRole)
+        {
+            CanWorkIt = false;
+        }
+        if (gen.QaManagerApprover == loggedInUser || gen.DepartmentApprover == loggedInUser || loggedInUserRole || gen.Owner == loggedInUser)
+        {
+            CanApproveIt = false;
+        }
+        if (gen.Verifier == loggedInUser || loggedInUserRole)
+        {
+            CanVerifyIt = false;
+        }
+        var userHasCTask = await db.Dthree.CountAsync(x => x.Responsible == loggedInUser );
+        var userHasPTask = await db.DfiveActions.CountAsync(x => x.Owner == loggedInUser);
+        if (userHasCTask > 0 || userHasPTask > 0 || loggedInUserRole)
+        {
+            HasTask = false;
+        }
+    }
+    private async Task<Dtwo> GetD2(int id)
+    {
+        var d2 = await db.Dtwo.FirstOrDefaultAsync(x => x.GeneralInformartionId == id && x.IsDeleted == false);
+        if (d2 != null)
+        {
+            enabledContainment = "";
+        }
+        return d2;
+    }
+    private async Task<List<Customers>> GetCustomersList()
+    {
+        return await db.Customers.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task<List<DProcesses>> GetProcessListM(int iddepartment)
+    {
+        return await db.DProcesses.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task<List<DDepartment>> GetAllDepartments()
+    {
+        return await db.DDepartment.Where(x => x.IsDeleted == false).ToListAsync();
+    }
+    private async Task<List<Dthree>> GetAllContainmentActions(int id)
+    {
+        var containmentActions = await db.Dthree.Where(x => x.GeneralInformartionId == id && x.IsDeleted == false).ToListAsync();
+        if (containmentActions != null)
+        {
+            enabledRootCause = "";
+        }
+        return containmentActions;
+    }
+    private async Task<List<DfiveActions>> GetAllPermanentActions(int id)
+    {
+        var actions = await db.DfiveActions.Where(x => x.GeneralInformartionId == id && x.IsDeleted == false).ToListAsync();
+        return actions;
+    }
+    public async Task<List<Dfour>> OWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Ocurrence").ToListAsync();
+    }
+    public async Task<List<Dfour>> EWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Escape").ToListAsync();
+    }
+    public async Task<List<Dfour>> SWhys()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Systemic").ToListAsync();
+    }
+    public async Task<List<Dfour>> ORcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Ocurrence").ToListAsync();
+    }
+    public async Task<List<Dfour>> ERcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Escape").ToListAsync();
+    }
+    public async Task<List<Dfour>> SRcs()
+    {
+        return await db.Dfour.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.IsRootCause == true && x.Type == "Systemic").ToListAsync();
+    }
+    private async Task<List<Dfour>> GetAllRootCauses(int id)
+    {
+        var getfivewhys = await db.Dfour.Where(x => x.GeneralInformartionId == id).ToListAsync();
+        if (getfivewhys != null)
+        {
+            enabledRootCause = "";
+        }
+        return getfivewhys;
+    }
+    private async Task<List<DProcessRoles>> GetProcessRoles(int id)
+    {
+        return await db.DProcessRoles.Where(x => x.ProcessId == id).ToListAsync();
+    }
+    private async Task<List<DRoles>> AllRoles()
+    {
+        return await db.DRoles.ToListAsync();
+    }
+    private async Task<List<AspNetUsers>> GetAllUsersM()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    protected void navigate(string d)
+    {
+        switch (d)
+        {
+            case "D0":
+                NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                break;
+            case "D1":
+                NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                break;
+            case "D2":
+                NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                break;
+            case "D3":
+                NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                break;
+            case "D4":
+                if (CheckIfContainmentComplete())
+                {
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                }
+                else
+                {
+                    AlertShow("danger", "Containment Must be Completed!");
+                }
+                break;
+            case "D5":
+                if (CheckIfContainmentComplete())
+                {
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                }
+                else
+                {
+                    AlertShow("danger", "Containment Must be Completed!");
+                }
+                break;
+            case "D7":
+                if (CheckIfContainmentComplete())
+                {
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                }
+                else
+                {
+                    AlertShow("danger", "Containment Must be Completed!");
+                }
+                break;
+            case "d7cross":
+                if (CheckIfContainmentComplete() && CheckIfActionsComplete())
+                {
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                }
+                else
+                {
+                    AlertShow("danger", "All actions Must be Completed!");
+                }
+                break;
+            case "D8":
+                if (CheckIfContainmentComplete() && CheckIfActionsComplete())
+                {
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
+                }
+                else
+                {
+                    AlertShow("danger", "All actions Must be Completed!");
+                }
+                break;
+            case "Print":                
+                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");                
+                break;
+        }
+    }
+    protected bool CheckIfContainmentComplete()
+    {
+        foreach(var c in ContainmentActions)
+        {
+            if (c.Status == "Open")
+                return false;
+        }
+        return true;
+    }
+    protected bool CheckIfActionsComplete()
+    {
+        foreach (var c in ContainmentActions)
+        {
+            if (c.Status == "Open" )
+                return false;
+        }
+        foreach(var a in PermanentActions)
+        {
+            if(a.Status == "Open" || a.Status == "Pending Action Plan Approval")
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    protected async Task navigateImplementation(string d)
+    {
+        var IsApproved = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Status != "Pending Action Plan Approval");
+
+        bool IsReady = IsApproved == null ? false : true;
+        if(IsReady == false)
+        {
+            AlertShow("danger", "Action plan must be approved in order to implement!");
+            return;
+        }
+        NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber}");
+    }
+    protected async Task navigatePage(string d)
+    {
+        bool IsReady = await CheckIfReadyToBeValidated();
+        if(IsReady == false)
+        {
+            if(d == "verification")
+            {
+                AlertShow("danger", "All actions must be implemented in order to verify!");
+                return;
+            }
+        }
+        NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber}");
+    }
+    private async Task CheckIfSubmittedBefore(int id)
+    {
+        if (gen.Dtwo == null || gen.Dthree == null || gen.Dfour == null || gen.Dfive == null || !CheckIfContainmentComplete())
+        {
+            AlertShow("danger","CAPA is not ready to be submitted for approval, please ensure all information has been provided.");
+            return;
+        }
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?" + Environment.NewLine + "If the action plan is already submitted it will restart approval process");
+        var principal = HttpContextAccessor.HttpContext.User;
+        loggedInUser = principal.FindFirstValue(ClaimTypes.NameIdentifier).ToString();
+        if (confirmed)
+        {
+            var submitted = await db.Dfive.FirstOrDefaultAsync(x => x.GeneralInformartionId == id && x.IsDeleted == false);
+            if (submitted != null)
+            {
+                if (EActions == null || OActions == null || SActions == null)
+                {
+                    AlertShow("danger", "Action plan is not complete " + Environment.NewLine + "and cannot be submitted for approval.");
+                    return;
+                }
+                var actionPlan = await db.Dfive.FirstOrDefaultAsync(x => x.IdActionPlan == submitted.IdActionPlan);
+                actionPlan.Submitted = DateTime.Now;
+                actionPlan.QaApprovalStatus = "Pending Action Plan Approval";
+                actionPlan.FunctionalApprovalStatus = "Pending Action Plan Approval";
+                actionPlan.FunctionalApproverComment = null;
+                actionPlan.QaApproverComment = null;
+                actionPlan.LastModifiedBy = loggedInUser;
+                actionPlan.LastModifiedOn = DateTime.Now;
+                db.Update(actionPlan);
+                int result = await db.SaveChangesAsync();
+                if (result > 0)
+                {
+                    var actions = await db.DfiveActions.Where(x => x.GeneralInformartionId == submitted.GeneralInformartionId && x.IsDeleted == false).ToListAsync();
+                    foreach (var action in actions)
+                    {
+                        action.MarkedAsCompleted = null;
+                        action.Comment = null;
+                        action.Evidence = null;
+                        action.LastModifiedBy = loggedInUser;
+                        action.LastModifiedOn = DateTime.Now;
+                        action.Status = "Pending Action Plan Approval";
+                        action.EffectivenessVerifiedByOne = null;
+                        action.EffectivenessVerificationStatusOne = null;
+                        action.EffectivenessVerificationCommentOne = null;
+                        action.EffectivenessVerifiedOnOne = null;
+
+                        action.EffectivenessVerifiedByTwo = null;
+                        action.EffectivenessVerificationStatusTwo = null;
+                        action.EffectivenessVerificationCommentTwo = null;
+                        action.EffectivenessVerifiedOnTwo = null;
+
+                        action.EffectivenessVerifiedByTwo = null;
+                        action.EffectivenessVerificationStatusTwo = null;
+                        action.EffectivenessVerificationCommentTwo = null;
+                        action.EffectivenessVerifiedOnTwo = null;
+                        db.Update(action);
+                    }
+                    try
+                    {
+                        gen.Status = "Pending Action Plan Approval";
+                        db.GeneralInformation.Update(gen);
+                        await db.SaveChangesAsync();
+                        AlertShow("success","Action plan submitted for approval.");
+                        body = await GetEmailBody();
+                        var qamanager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.QaManagerApprover);
+                        var approver = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.DepartmentApprover);
+
+                        sendEmail = new SendEmailClass
+                        (
+                            qamanager.NormalizedEmail + ";" + approver.NormalizedEmail + ";" + gen.OwnerNavigation.NormalizedEmail,
+                            gen.OwnerNavigation.Email,
+                            body,
+                            $"{IdCar} submitted for approval"
+                        );
+                        var email = sendEmail.SendEmailGeneric();
+
+                    }
+                    catch (Exception ex)
+                    {
+                        AlertShow("danger",  ex.InnerException.ToString());
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                AlertShow("danger", "Action plan is not complete " + Environment.NewLine + "and cannot be submitted for approval.");
+                return;
+            }
+        }
+    }
+    private async Task<List<DtwoPictures>> PicturesList(int id)
+    {
+        return await db.DtwoPictures.Where(x => x.IdTwo == id).ToListAsync();
+    }
+    public async Task<List<DfiveActions>> GetOActions()
+    {
+        return await db.DfiveActions.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Ocurrence").ToListAsync();
+    }
+    public async Task<List<DfiveActions>> GetEActions()
+    {
+        return await db.DfiveActions.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Escape").ToListAsync();
+    }
+    public async Task<List<DfiveActions>> GetSActions()
+    {
+        return await db.DfiveActions.Where(x => x.GeneralInformartionId == CarIdNumber && x.IsDeleted == false && x.Type == "Systemic").ToListAsync();
+    }
+    public async Task<Dfive> GetApprovals()
+    {
+
+        Dfive approver = await db.Dfive.Include(g => g.GeneralInformartion).FirstOrDefaultAsync(x => x.GeneralInformartionId.Equals(CarIdNumber) && x.IsDeleted.Equals(false));
+        return approver;
+    }
+    private async Task OnDeleteDialogClose()
+    {
+        await Task.Run(()=>DeleteDialogOpen = false);
+        StateHasChanged();
+    }
+    private async void OpenDeleteDialog(int id)
+    {
+        var IsSubmitted = await db.Dfive.FirstOrDefaultAsync(x => x.GeneralInformartionId == gen.GeneralInformartionId && x.IsDeleted == false && x.Submitted != null);
+        if(IsSubmitted != null){
+            idtopass = id;
+            DeleteDialogOpen = true;
+            StateHasChanged();
+        }
+        else
+        {
+            AlertShow("danger", "Action plan has not been submitted for approval.");
+            return;
+        }
+    }
+    private async Task<bool> CheckIfReadyToBeValidated()
+    {
+        //var containmentReady = await db.Dthree.CountAsync(x => x.IsDeleted == false && x.GeneralInformartionId == CarIdNumber && x.Status != "Closed");
+        var permanentReady = await db.DfiveActions
+            .CountAsync
+            (
+                x => x.IsDeleted == false &&
+                x.GeneralInformartionId == CarIdNumber &&
+                x.Status != "Pending Action Plan Approval" &&
+                x.Status != "Pending Verification" &&
+                x.Status != "Closed"
+            );
+
+        if(permanentReady > 0)
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+    private void resetalert()
+    {
+        AlertMessage = string.Empty;
+        AlertType = "danger";
+        HideAlert = true;
+    }
+    private void AlertShow(string type, string msg)
+    {
+        AlertMessage = msg;
+        AlertType = type;
+        HideAlert = false;
+    }
+    protected async Task<string> GetEmailBody()
+    {
+        string tdStyle = "border: 1px solid #ddd; padding: 8px; margin:auto;";
+        string thStyle = "border: 1px solid #ddd; padding-top: 12px; padding-bottom: 12px; background-color: #800080; color:white;";
+
+        var g = await db.GeneralInformation.FirstOrDefaultAsync(x => x.GeneralInformartionId == gen.GeneralInformartionId);
+        var qamanager = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.QaManagerApprover);
+        var approver = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.DepartmentApprover);
+        var verifier = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.Owner);
+        var clause = await db.DClauses.FirstOrDefaultAsync(x => x.ClauseId == gen.Clause);
+        body += $"<strong>Expected Closure Date:  {gen.ExpectedClosureDate.ToShortDateString()}</strong>";
+        body += $"<table border='1' style='border-collapse:collapse; width:100%; padding-top:12px;font-family: Arial, Helvetica, sans-serif;'>";
+        body += $"<thead>";
+        body += $"<tr>";
+        body += $"<th style='{thStyle}'>CAPA Number</th>";
+        body += $"<th style='{thStyle}'>CAPA Type</th>";
+        body += $"<th style='{thStyle}'>Source</th>";
+        body += $"<th style='{thStyle}'>Standard</th>";
+        body += $"<th style='{thStyle}'>Clause</th>";
+        body += $"<th style='{thStyle}'>Process</th>";
+        body += $"<th style='{thStyle}'>Severity</th>";
+        body += $"<th style='{thStyle}'>Symptom</th>";
+        body += $"<th style='{thStyle}'>Owner</th>";
+        body += $"<th style='{thStyle}'>Department Manager</th>";
+        body += $"</t>";
+        body += $"</thead>";
+        body += $"<tbody>";
+        body += $"<tr>";
+        body += $"<td style='{tdStyle}'>{ g.CapaNumber}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Type}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Source}</td>";
+        body += $"<td style='{tdStyle}'>{ g.Standard}</td>";
+        body += $"<td style='{tdStyle}'>{ clause.ClauseNumber} {clause.ClauseName}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Process.ProcessName}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Severity}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.Symptom}</td>";
+        body += $"<td style='{tdStyle}'>{ gen.OwnerNavigation.NormalizedUserName.Substring(0, gen.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"<td style='{tdStyle}'>{ approver.NormalizedUserName.Substring(0, approver.NormalizedUserName.LastIndexOf("@"))}</td>";
+        body += $"</tr>";
+        body += @"</tbody></table>";
+        body += $"<p>CAPA requires your attention, click the <a href='http://10.131.40.41:4401/Admin/general/{gen.GeneralInformartionId}'>Link</a> to access the system.</p>";
+        return body;
+
+    }
+}

@@ -1,0 +1,26 @@
+﻿@using System.Net.Http
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.JSInterop
+@using eCapa
+@using eCapa.Shared
+@using eCapa.Models
+@using eCapa.Models.HelperClasses
+@using System.Security;
+@using System.Security.Claims;
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Http
+@using Microsoft.EntityFrameworkCore
+@using eCapa.Pages.Admin.Components
+@using BlazorInputFile
+@using System.IO
+@using Microsoft.AspNetCore.Hosting;
+@inject UserManager<IdentityUser> _UserManager
+@inject RoleManager<IdentityRole> _RoleManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@attribute [Authorize]
