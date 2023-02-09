@@ -18,6 +18,7 @@
                 <tr>
                     <th  style="cursor:pointer">Detail</th>
                     <th>CapaNumber</th>
+                    <th>Owner</th>
                     <th>Type</th>
                     <th>Audit Number</th>
                     <th>Customer</th>
@@ -54,6 +55,7 @@
                         <tr id="@i">
                             <td class="align-content-center"><a @onclick="@(async () => await Toggle(d.GeneralInformartionId, i))"><span class="@icon" aria-hidden="true"></span></a></td>
                             <td><a href="#" @onclick="@(() => navigate(d.GeneralInformartionId.ToString()))">@d.CapaNumber</a></td>
+                            <td>@d.OwnerNavigation.NormalizedUserName.Substring(0,d.OwnerNavigation.NormalizedUserName.LastIndexOf("@"))</td>
                             <td>@d.Type</td>
                             <td>@d.AuditReportNumber</td>
                             <td>@d.Customer.CustomerName</td>
@@ -110,7 +112,7 @@
         protected override async Task OnInitializedAsync()
         {
             setUser();
-            EightList = await GetList(Filter);            
+            EightList = await GetList(Filter);
         }
         public void setUser()
         {
@@ -187,7 +189,7 @@
                 {
 
                     icon = "oi oi-plus";
-                }             
+                }
 
             }
             else
@@ -209,9 +211,10 @@
         protected async Task<IEnumerable<GeneralInformation>> GetList(string filter)
         {
             if (string.IsNullOrEmpty(filter))
-            {
+            {                
                 EightList = await db.GeneralInformation
                .Where(x => x.IsDeleted == false)
+               .Include(x => x.OwnerNavigation)
                .Include(c => c.Customer)
                .Include(d => d.Dthree)
                .Where(d => d.IsDeleted == false)

@@ -9,19 +9,19 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace eCapa.Models
 {
-    [Table("dProcessClauses")]
-    public partial class DProcessClauses
+    [Table("dStandardClause")]
+    public partial class DStandardClause
     {
         [Key]
-        public int ProcessId { get; set; }
-        [Key]
+        public int IdStandardClause { get; set; }
         public int ClauseId { get; set; }
+        public int StandardId { get; set; }
 
         [ForeignKey(nameof(ClauseId))]
-        [InverseProperty(nameof(DClauses.DProcessClauses))]
+        [InverseProperty(nameof(DClauses.DStandardClause))]
         public virtual DClauses Clause { get; set; }
-        [ForeignKey(nameof(ProcessId))]
-        [InverseProperty(nameof(DProcesses.DProcessClauses))]
-        public virtual DProcesses Process { get; set; }
+        [ForeignKey(nameof(StandardId))]
+        [InverseProperty(nameof(Dstandards.DStandardClause))]
+        public virtual Dstandards Standard { get; set; }
     }
 }

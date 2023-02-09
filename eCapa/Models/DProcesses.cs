@@ -15,7 +15,6 @@ namespace eCapa.Models
         public DProcesses()
         {
             DDepartmentProcesses = new HashSet<DDepartmentProcesses>();
-            DProcessClauses = new HashSet<DProcessClauses>();
             DProcessRoles = new HashSet<DProcessRoles>();
             GeneralInformation = new HashSet<GeneralInformation>();
         }
@@ -42,8 +41,6 @@ namespace eCapa.Models
 
         [InverseProperty("Process")]
         public virtual ICollection<DDepartmentProcesses> DDepartmentProcesses { get; set; }
-        [InverseProperty("Process")]
-        public virtual ICollection<DProcessClauses> DProcessClauses { get; set; }
         [InverseProperty("Process")]
         public virtual ICollection<DProcessRoles> DProcessRoles { get; set; }
         [InverseProperty("Process")]

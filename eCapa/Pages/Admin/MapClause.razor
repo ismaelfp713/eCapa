@@ -4,7 +4,7 @@
 @inject IJSRuntime js
 @inject IHttpContextAccessor HttpContextAccessor
 
-<h1 class="ml-2">Map Clause to Process</h1>
+<h1 class="ml-2">Map Clause to Standard</h1>
 <div class="container-fluid">
      <div class="alert alert-@AlertType alert-dismissable text-center" role="alert" hidden="@HideAlert">
         <button type = "button" class = "close" data-dismiss="alert" @onclick="@(() => resetalert())" aria-hidden = "true">
@@ -12,12 +12,12 @@
         </button>
       @AlertMessage
     </div>
-    <EditForm Model="@processClauses" OnValidSubmit="@SaveGeneralInformation" class="">
+    <EditForm Model="@standardClauses" OnValidSubmit="@SaveGeneralInformation" class="">
         <DataAnnotationsValidator />
         <ValidationSummary />
         <div class="form-group card">
             <div class="card-header">
-                <h3 class="mb-3 ">Process: @process.ProcessName</h3>
+                <h3 class="mb-3 ">Standard: @standard.Name</h3>
             </div>
             <div class="card-body">
                 <div class="form-row">                   
@@ -102,16 +102,16 @@
         QAD_QMSContext db = new QAD_QMSContext();
         [Parameter]
         public string ProcessId { get; set; }
-        public int PId { get; set; }
+        public int SId { get; set; }
         DClauses clause = new DClauses();
         [Required]
         public string ClauseId { get; set; }
-        DProcessClauses processClauses = new DProcessClauses();
+        DStandardClause standardClauses = new DStandardClause();
         public string loggedInUser = string.Empty;
-        DProcesses process = new DProcesses();
+        Dstandards standard = new Dstandards();
         public IEnumerable<DClauses> GetList { get; set; }
         public List<DClauses> GetClausesList { get; set; } = null;
-        public IEnumerable<DProcessClauses> GetAssignedClauses { get; set; }
+        public IEnumerable<DStandardClause> GetAssignedClauses { get; set; }
         public bool HideAlert { get; set; } = true;
         public string AlertMessage { get; set; } = string.Empty;
         public string AlertType { get; set; } = "danger";
@@ -131,20 +131,20 @@
         {
             try
             {
-                PId = Convert.ToInt32(ProcessId);
+                SId = Convert.ToInt32(ProcessId);
                 int cid = Convert.ToInt32(ClauseId);
-                if (processClauses.ClauseId == 0 && processClauses.ProcessId == 0)
+                if (standardClauses.ClauseId == 0 && standardClauses.StandardId == 0)
                 {
-                    processClauses.ProcessId = PId;
-                    processClauses.ClauseId = cid;
-                    var exists = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ClauseId == cid && x.ProcessId == PId);
+                    standardClauses.StandardId = SId;
+                    standardClauses.ClauseId = cid;
+                    var exists = await db.DStandardClause.FirstOrDefaultAsync(x => x.ClauseId == cid && x.StandardId == SId);
                     if(exists == null)
                     {
-                        db.DProcessClauses.Add(processClauses);
+                        db.DStandardClause.Add(standardClauses);
                     }
                     else
                     {
-                        AlertShow("danger","Clause is already mapped to this process!");
+                        AlertShow("danger","Clause is already mapped to this standard!");
                         ClauseId = string.Empty;
                         return;
                     }
@@ -152,9 +152,9 @@
                 }
                 await db.SaveChangesAsync();
                 GetList = await GetListM();
-                GetAssignedClauses = await GetProcessClausesM(PId);
+                GetAssignedClauses = await GetStandarClausesM(SId);
                 GetClausesList = await GetAssignedClausesM();
-                processClauses = new DProcessClauses();
+                standardClauses = new DStandardClause();
                 ClauseId = string.Empty;
             }
             catch (Exception ex)
@@ -165,15 +165,15 @@
         }
         protected void Clear()
         {
-            processClauses = new DProcessClauses();
+            standardClauses = new DStandardClause();
         }
         protected override async Task OnInitializedAsync()
         {
-            PId = Convert.ToInt32(ProcessId);
-            process = await db.DProcesses
-            .FirstOrDefaultAsync(x => x.ProcessId == PId);
+            SId = Convert.ToInt32(ProcessId);
+            standard = await db.Dstandards
+            .FirstOrDefaultAsync(x => x.IdStandard == SId);
 
-            GetAssignedClauses = await GetProcessClausesM(PId);
+            GetAssignedClauses = await GetStandarClausesM(SId);
             GetClausesList = await GetAssignedClausesM();
             GetList = await GetListM();
         }
@@ -183,15 +183,15 @@
             .Where(x => x.IsDeleted == false)
             .ToListAsync();
         }
-        public async Task<IEnumerable<DProcessClauses>> GetProcessClausesM(int pid)
+        public async Task<IEnumerable<DStandardClause>> GetStandarClausesM(int sid)
         {
-            return await db.DProcessClauses
-            .Where(x => x.ProcessId == pid)
+            return await db.DStandardClause
+            .Where(x => x.StandardId == sid)
             .ToListAsync();
         }
         protected async Task ToEdit(int id)
         {
-            processClauses = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ClauseId == id);
+            standardClauses = await db.DStandardClause.FirstOrDefaultAsync(x => x.ClauseId == id);
         }
         public async Task<List<DClauses>> GetAssignedClausesM()
         {
@@ -208,13 +208,13 @@
             bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
             if (confirmed)
             {
-                var clause = await db.DProcessClauses.FirstOrDefaultAsync(x => x.ProcessId == PId && x.ClauseId == clauseId);
-                db.DProcessClauses.Remove(clause);
+                var clause = await db.DStandardClause.FirstOrDefaultAsync(x => x.StandardId == SId && x.ClauseId == clauseId);
+                db.DStandardClause.Remove(clause);
                 await db.SaveChangesAsync();
-                GetAssignedClauses = await GetProcessClausesM(PId);
+                GetAssignedClauses = await GetStandarClausesM(SId);
                 GetClausesList = await GetAssignedClausesM();
                 GetList = await GetListM();
-                clause = new DProcessClauses();
+                clause = new DStandardClause();
             }
         }
 }

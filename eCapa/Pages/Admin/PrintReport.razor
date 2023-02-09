@@ -101,6 +101,19 @@
                                             <td>@t.User.NormalizedEmail</td>
                                         </tr>
                                     }
+                                    if (ExtraMembers != null && ExtraMembers.Count() > 0)
+                                    {
+
+                                        @foreach (var e in ExtraMembers)
+                                        {
+                                            <tr>
+                                                <td>@e.IdRoleNavigation.RoleName</td>
+                                                <td>@e.IdUserNavigation.NormalizedUserName.Substring(0, e.IdUserNavigation.NormalizedUserName.IndexOf("@"))</td>
+                                                <td>@e.IdUserNavigation.PhoneNumber</td>
+                                                <td>@e.IdUserNavigation.NormalizedEmail</td>
+                                            </tr>
+                                        }
+                                    }
                                 }
                             </tbody>
                         </table>
@@ -809,12 +822,10 @@
                 </div>
             </div>
         </div>
-
         <div class="card-footer float-right">
         </div>
     </div>
 </div>
-
 
 @code {
     public bool DeleteDialogOpen { get; set; }
@@ -848,7 +859,7 @@
     public IEnumerable<DfiveActions> OActions { get; set; }
     public IEnumerable<DfiveActions> EActions { get; set; }
     public IEnumerable<DfiveActions> SActions { get; set; }
-    public IEnumerable<Dseven> PreventiveActions { get; set; }   
+    public IEnumerable<Dseven> PreventiveActions { get; set; }
     public string body { get; set; }
     public bool HasTask { get; set; } = true;
     public bool CanWorkIt { get; set; } = true;
@@ -872,6 +883,7 @@
     public bool HideAlert { get; set; } = true;
     public string AlertMessage { get; set; } = string.Empty;
     public string AlertType { get; set; } = "danger";
+    List<DCapaExtraMembers> ExtraMembers = new List<DCapaExtraMembers>();
     public async Task SaveGeneralInformation()
     {
         gen.LastModifiedBy = loggedInUser;
@@ -937,6 +949,7 @@
         subclause = await db.DSubClauses.FirstOrDefaultAsync(x => x.SubClauseId == gen.SubClause);
         processAssRoles = await GetProcessRoles(process.ProcessId);
         createdBy = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.CreatedBy);
+        ExtraMembers = await GetAddtionalTeamMembers();
         d2 = await GetD2(id);
         if (d2 != null)
         {
@@ -979,6 +992,11 @@
         {
             HasTask = false;
         }
+    }
+    private async Task<List<DCapaExtraMembers>> GetAddtionalTeamMembers()
+    {
+        var members = await db.DCapaExtraMembers.Where(x => x.IdCapa == gen.GeneralInformartionId).ToListAsync();
+        return members;
     }
     private async Task<Dtwo> GetD2(int id)
     {

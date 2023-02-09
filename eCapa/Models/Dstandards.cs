@@ -9,25 +9,24 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace eCapa.Models
 {
-    [Table("dRoles")]
-    public partial class DRoles
+    [Table("DStandards")]
+    public partial class Dstandards
     {
-        public DRoles()
+        public Dstandards()
         {
-            DCapaExtraMembers = new HashSet<DCapaExtraMembers>();
-            DProcessRoles = new HashSet<DProcessRoles>();
+            DStandardClause = new HashSet<DStandardClause>();
         }
 
         [Key]
-        public int RoleId { get; set; }
+        public int IdStandard { get; set; }
         [Required]
         [StringLength(50)]
-        public string RoleName { get; set; }
-        [Column(TypeName = "datetime")]
-        public DateTime Created { get; set; }
+        public string Name { get; set; }
         [Required]
         [StringLength(450)]
         public string CreatedBy { get; set; }
+        [Column(TypeName = "datetime")]
+        public DateTime Created { get; set; }
         public bool IsDeleted { get; set; }
         [StringLength(450)]
         public string DeletedBy { get; set; }
@@ -38,9 +37,7 @@ namespace eCapa.Models
         [Column(TypeName = "datetime")]
         public DateTime? LastModifiedOn { get; set; }
 
-        [InverseProperty("IdRoleNavigation")]
-        public virtual ICollection<DCapaExtraMembers> DCapaExtraMembers { get; set; }
-        [InverseProperty("Role")]
-        public virtual ICollection<DProcessRoles> DProcessRoles { get; set; }
+        [InverseProperty("Standard")]
+        public virtual ICollection<DStandardClause> DStandardClause { get; set; }
     }
 }

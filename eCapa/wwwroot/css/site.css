@@ -131,7 +131,9 @@ app {
     width: 100%;
     z-index: 1000;
 }
-
+#admin-nav-link {
+    cursor: pointer;
+}
 #blazor-error-ui .dismiss {
     cursor: pointer;
     position: absolute;

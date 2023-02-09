@@ -17,6 +17,7 @@ namespace eCapa.Models
             AspNetUserLogins = new HashSet<AspNetUserLogins>();
             AspNetUserRoles = new HashSet<AspNetUserRoles>();
             AspNetUserTokens = new HashSet<AspNetUserTokens>();
+            DCapaExtraMembers = new HashSet<DCapaExtraMembers>();
             DProcessRoles = new HashSet<DProcessRoles>();
             DfiveActions = new HashSet<DfiveActions>();
             DocumentHistory = new HashSet<DocumentHistory>();
@@ -57,6 +58,8 @@ namespace eCapa.Models
         public virtual ICollection<AspNetUserRoles> AspNetUserRoles { get; set; }
         [InverseProperty("User")]
         public virtual ICollection<AspNetUserTokens> AspNetUserTokens { get; set; }
+        [InverseProperty("IdUserNavigation")]
+        public virtual ICollection<DCapaExtraMembers> DCapaExtraMembers { get; set; }
         [InverseProperty("User")]
         public virtual ICollection<DProcessRoles> DProcessRoles { get; set; }
         [InverseProperty("OwnerNavigation")]

@@ -155,7 +155,7 @@
     }
     private async Task<IEnumerable<DClauses>> GetListM()
     {
-        return await db.DClauses.Where(x => x.IsDeleted == false).ToListAsync();
+        return await db.DClauses.Where(x => x.IsDeleted.Equals(false)).ToListAsync();
     }
     protected async Task MarkAsDeleted(int id)
     {

@@ -29,8 +29,7 @@ namespace eCapa.Models
         public virtual DbSet<Customers> Customers { get; set; }
         public virtual DbSet<DClauses> DClauses { get; set; }
         public virtual DbSet<DDepartment> DDepartment { get; set; }
-        public virtual DbSet<DDepartmentProcesses> DDepartmentProcesses { get; set; }
-        public virtual DbSet<DProcessClauses> DProcessClauses { get; set; }
+        public virtual DbSet<DDepartmentProcesses> DDepartmentProcesses { get; set; }        
         public virtual DbSet<DProcessRoles> DProcessRoles { get; set; }
         public virtual DbSet<DProcesses> DProcesses { get; set; }
         public virtual DbSet<DRoles> DRoles { get; set; }
@@ -152,28 +151,7 @@ namespace eCapa.Models
                     .HasForeignKey(d => d.ProcessId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_dDepartmentProcesses_dProcesses");
-            });
-
-            modelBuilder.Entity<DProcessClauses>(entity =>
-            {
-                entity.HasKey(e => new { e.ProcessId, e.ClauseId })
-                    .HasName("PK_DatabaseList")
-                    .IsClustered(false);
-
-                entity.HasIndex(e => e.ProcessId)
-                    .HasName("IX_dProcessClauses");
-
-                entity.HasOne(d => d.Clause)
-                    .WithMany(p => p.DProcessClauses)
-                    .HasForeignKey(d => d.ClauseId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_dProcessClauses_dClauses");
-
-                entity.HasOne(d => d.Process)
-                    .WithMany(p => p.DProcessClauses)
-                    .HasForeignKey(d => d.ProcessId)
-                    .HasConstraintName("FK_dProcessClauses_dProcesses");
-            });
+            });            
 
             modelBuilder.Entity<DProcessRoles>(entity =>
             {

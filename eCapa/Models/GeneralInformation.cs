@@ -13,6 +13,7 @@ namespace eCapa.Models
     {
         public GeneralInformation()
         {
+            DCapaExtraMembers = new HashSet<DCapaExtraMembers>();
             Deight = new HashSet<Deight>();
             Dfive = new HashSet<Dfive>();
             Dfour = new HashSet<Dfour>();
@@ -98,6 +99,8 @@ namespace eCapa.Models
         [ForeignKey(nameof(ProcessId))]
         [InverseProperty(nameof(DProcesses.GeneralInformation))]
         public virtual DProcesses Process { get; set; }
+        [InverseProperty("IdCapaNavigation")]
+        public virtual ICollection<DCapaExtraMembers> DCapaExtraMembers { get; set; }
         [InverseProperty("GeneralInformation")]
         public virtual ICollection<Deight> Deight { get; set; }
         [InverseProperty("GeneralInformartion")]

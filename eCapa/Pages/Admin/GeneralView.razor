@@ -121,6 +121,19 @@
                                             <td>@t.User.NormalizedEmail</td>
                                         </tr>
                                     }
+                                    if (ExtraMembers != null && ExtraMembers.Count() > 0)
+                                    {
+
+                                        @foreach (var e in ExtraMembers)
+                                        {
+                                            <tr>
+                                                <td>@e.IdRoleNavigation.RoleName</td>
+                                                <td>@e.IdUserNavigation.NormalizedUserName.Substring(0, e.IdUserNavigation.NormalizedUserName.IndexOf("@"))</td>
+                                                <td>@e.IdUserNavigation.PhoneNumber</td>
+                                                <td>@e.IdUserNavigation.NormalizedEmail</td>
+                                            </tr>
+                                        }
+                                    }
                                 }
                             </tbody>
                         </table>
@@ -164,14 +177,14 @@
                                 @if (ContainmentActions == null)
                                 {
                                     <tr>
-                                        <td colspan="7">Loading...</td>
+                                        <td colspan="12">Loading...</td>
                                     </tr>
                                 }
                                 else if (ContainmentActions.Count() == 0)
                                 {
 
                                     <tr>
-                                        <td colspan="7">No actions registered!</td>
+                                        <td colspan="12">No actions registered!</td>
                                     </tr>
                                 }
                                 else
@@ -658,6 +671,7 @@
     public bool CanVerifyIt { get; set; } = true;
     List<DProcessRoles> processAssRoles = new List<DProcessRoles>();
     List<DtwoPictures> getPictures = new List<DtwoPictures>();
+    List<DCapaExtraMembers> ExtraMembers = new List<DCapaExtraMembers>();
     List<Dfour> getRootCauses { get; set; }
     public Dfive approvals { get; set; }
     public string loggedInUser = string.Empty;
@@ -739,6 +753,7 @@
         subclause = await db.DSubClauses.FirstOrDefaultAsync(x => x.SubClauseId == gen.SubClause);
         processAssRoles = await GetProcessRoles(process.ProcessId);
         createdBy = await db.AspNetUsers.FirstOrDefaultAsync(x => x.Id == gen.CreatedBy);
+        ExtraMembers = await GetAddtionalTeamMembers();
         d2 = await GetD2(id);
         if (d2 != null)
         {
@@ -926,8 +941,8 @@
                     AlertShow("danger", "All actions Must be Completed!");
                 }
                 break;
-            case "Print":                
-                    NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");                
+            case "Print":
+                NavigationManager.NavigateTo($"/Admin/{d}/{CarIdNumber.ToString()}");
                 break;
         }
     }
@@ -1112,6 +1127,11 @@
             AlertShow("danger", "Action plan has not been submitted for approval.");
             return;
         }
+    }
+    private async Task<List<DCapaExtraMembers>> GetAddtionalTeamMembers()
+    {
+        var members = await db.DCapaExtraMembers.Where(x => x.IdCapa == gen.GeneralInformartionId).ToListAsync();
+        return members;
     }
     private async Task<bool> CheckIfReadyToBeValidated()
     {

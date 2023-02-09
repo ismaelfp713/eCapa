@@ -27,13 +27,14 @@ namespace eCapa.Models
         public virtual DbSet<AspNetUserTokens> AspNetUserTokens { get; set; }
         public virtual DbSet<AspNetUsers> AspNetUsers { get; set; }
         public virtual DbSet<Customers> Customers { get; set; }
+        public virtual DbSet<DCapaExtraMembers> DCapaExtraMembers { get; set; }
         public virtual DbSet<DClauses> DClauses { get; set; }
         public virtual DbSet<DDepartment> DDepartment { get; set; }
         public virtual DbSet<DDepartmentProcesses> DDepartmentProcesses { get; set; }
-        public virtual DbSet<DProcessClauses> DProcessClauses { get; set; }
         public virtual DbSet<DProcessRoles> DProcessRoles { get; set; }
         public virtual DbSet<DProcesses> DProcesses { get; set; }
         public virtual DbSet<DRoles> DRoles { get; set; }
+        public virtual DbSet<DStandardClause> DStandardClause { get; set; }
         public virtual DbSet<DSubClauses> DSubClauses { get; set; }
         public virtual DbSet<Deight> Deight { get; set; }
         public virtual DbSet<Developers> Developers { get; set; }
@@ -43,6 +44,7 @@ namespace eCapa.Models
         public virtual DbSet<DocumentHistory> DocumentHistory { get; set; }
         public virtual DbSet<Dseven> Dseven { get; set; }
         public virtual DbSet<DsevenCross> DsevenCross { get; set; }
+        public virtual DbSet<Dstandards> Dstandards { get; set; }
         public virtual DbSet<Dthree> Dthree { get; set; }
         public virtual DbSet<Dtwo> Dtwo { get; set; }
         public virtual DbSet<DtwoPictures> DtwoPictures { get; set; }
@@ -127,6 +129,26 @@ namespace eCapa.Models
                 entity.Property(e => e.LastModifiedOn).HasDefaultValueSql("(getdate())");
             });
 
+            modelBuilder.Entity<DCapaExtraMembers>(entity =>
+            {
+                entity.Property(e => e.IdRole).HasDefaultValueSql("('Team Member')");
+
+                entity.HasOne(d => d.IdCapaNavigation)
+                    .WithMany(p => p.DCapaExtraMembers)
+                    .HasForeignKey(d => d.IdCapa)
+                    .HasConstraintName("FK_dCapaExtraMembers_GeneralInformation");
+
+                entity.HasOne(d => d.IdRoleNavigation)
+                    .WithMany(p => p.DCapaExtraMembers)
+                    .HasForeignKey(d => d.IdRole)
+                    .HasConstraintName("FK_dCapaExtraMembers_dRoles");
+
+                entity.HasOne(d => d.IdUserNavigation)
+                    .WithMany(p => p.DCapaExtraMembers)
+                    .HasForeignKey(d => d.IdUser)
+                    .HasConstraintName("FK_dCapaExtraMembers_AspNetUsers");
+            });
+
             modelBuilder.Entity<DClauses>(entity =>
             {
                 entity.Property(e => e.LastModifiedOn).HasDefaultValueSql("(getdate())");
@@ -153,27 +175,6 @@ namespace eCapa.Models
                     .HasForeignKey(d => d.ProcessId)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_dDepartmentProcesses_dProcesses");
-            });
-
-            modelBuilder.Entity<DProcessClauses>(entity =>
-            {
-                entity.HasKey(e => new { e.ProcessId, e.ClauseId })
-                    .HasName("PK_DatabaseList")
-                    .IsClustered(false);
-
-                entity.HasIndex(e => e.ProcessId)
-                    .HasName("IX_dProcessClauses");
-
-                entity.HasOne(d => d.Clause)
-                    .WithMany(p => p.DProcessClauses)
-                    .HasForeignKey(d => d.ClauseId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_dProcessClauses_dClauses");
-
-                entity.HasOne(d => d.Process)
-                    .WithMany(p => p.DProcessClauses)
-                    .HasForeignKey(d => d.ProcessId)
-                    .HasConstraintName("FK_dProcessClauses_dProcesses");
             });
 
             modelBuilder.Entity<DProcessRoles>(entity =>
@@ -207,6 +208,23 @@ namespace eCapa.Models
             modelBuilder.Entity<DRoles>(entity =>
             {
                 entity.Property(e => e.LastModifiedOn).HasDefaultValueSql("(getdate())");
+            });
+
+            modelBuilder.Entity<DStandardClause>(entity =>
+            {
+                entity.HasKey(e => e.IdStandardClause)
+                    .HasName("PK_dStandardClause_1");
+
+                entity.HasOne(d => d.Clause)
+                    .WithMany(p => p.DStandardClause)
+                    .HasForeignKey(d => d.ClauseId)
+                    .OnDelete(DeleteBehavior.ClientSetNull)
+                    .HasConstraintName("FK_dStandardClause_dClauses");
+
+                entity.HasOne(d => d.Standard)
+                    .WithMany(p => p.DStandardClause)
+                    .HasForeignKey(d => d.StandardId)
+                    .HasConstraintName("FK_dStandardClause_DStandards");
             });
 
             modelBuilder.Entity<DSubClauses>(entity =>
@@ -383,6 +401,15 @@ namespace eCapa.Models
                     .WithMany(p => p.DsevenCross)
                     .HasForeignKey(d => d.GeneralInformationId)
                     .HasConstraintName("FK_DsevenCross_GeneralInformation");
+            });
+
+            modelBuilder.Entity<Dstandards>(entity =>
+            {
+                entity.Property(e => e.Created).HasDefaultValueSql("(getdate())");
+
+                entity.Property(e => e.LastModifiedOn).HasDefaultValueSql("(getdate())");
+
+                entity.Property(e => e.Name).IsUnicode(false);
             });
 
             modelBuilder.Entity<Dthree>(entity =>

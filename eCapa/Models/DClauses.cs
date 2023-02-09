@@ -14,7 +14,7 @@ namespace eCapa.Models
     {
         public DClauses()
         {
-            DProcessClauses = new HashSet<DProcessClauses>();
+            DStandardClause = new HashSet<DStandardClause>();
             DSubClauses = new HashSet<DSubClauses>();
         }
 
@@ -43,7 +43,7 @@ namespace eCapa.Models
         public DateTime? LastModifiedOn { get; set; }
 
         [InverseProperty("Clause")]
-        public virtual ICollection<DProcessClauses> DProcessClauses { get; set; }
+        public virtual ICollection<DStandardClause> DStandardClause { get; set; }
         [InverseProperty("Clause")]
         public virtual ICollection<DSubClauses> DSubClauses { get; set; }
     }

@@ -1,0 +1,205 @@
+﻿@attribute [Authorize(Roles = "Admin, SuperAdmin")]
+@inject IJSRuntime js
+@inject IHttpContextAccessor HttpContextAccessor
+<div class="modal fade show" id="myModal" style="display:block; background-color: rgba(10,10,10,.8);"
+     aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">@Title</h4>
+                <button type="button" class="close" @onclick="@ModalCancel">&times;</button>
+            </div>
+            <EditForm Model="@processRoles" OnValidSubmit="@SaveGeneralInformation" class="">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+                <div class="modal-body">
+                    <p>@Text</p>
+                    <div class="form-group form-inline col-md-12">
+                        <InputSelect @bind-Value="@RoleId" required class="form-control col-md-4">
+                            <option selected value="">Select Team Member Role</option>
+                            @if (GetAllRoles != null)
+                            {
+                                @foreach (var role in GetAllRoles)
+                                {
+                                    <option value="@role.RoleId.ToString()">@role.RoleName</option>
+                                }
+                            }
+                            else
+                            {
+                                <option selected value="">No Roles Found!</option>
+                            }
+                        </InputSelect>
+                        <InputSelect @bind-Value="@processRoles.IdUser" required class="form-control col-md-4 ml-2">
+                            <option selected value="">Select User</option>
+                            @if (GetAllUsers != null)
+                            {
+                                @foreach (var user in GetAllUsers)
+                                {
+                                    <option value="@user.Id">@user.UserName</option>
+                                }
+                            }
+                            else
+                            {
+                                <option selected value="">No Users Found!</option>
+                            }
+                        </InputSelect>
+                        <button type="button" class="btn btn-primary ml-2" @onclick="@SaveGeneralInformation">Save</button>
+                    </div>
+                    <h3 class="mb-3 ">Addtional Team Members Assigned</h3>
+                    <table class="table table-striped table-bordered">
+                        <thead class="thead-dark">
+                            <tr>
+                                <th>Role</th>
+                                <th>User</th>
+                                <th colspan="2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (processAssRoles == null)
+                            {
+                                <tr>
+                                    <td colspan="2">Loading...</td>
+                                </tr>
+                            }
+                            else if (processAssRoles.Count() == 0)
+                            {
+                                <tr>
+                                    <td colspan="2">No team members assigned!</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var g in processAssRoles)
+                                {
+                                    <tr>
+                                        <td>@g.IdRoleNavigation.RoleName</td>
+                                        <td>@g.IdUserNavigation.UserName</td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm" @onclick="@(async () => await MarkAsDeleted(g.IdCapaMember))">Delete</button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer align-content-center alert-@Alert">
+                    @Message
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    QAD_QMSContext db = new QAD_QMSContext();
+    DCapaExtraMembers processRoles = new DCapaExtraMembers();
+    List<DCapaExtraMembers> processAssRoles = new List<DCapaExtraMembers>();
+    AspNetUsers users = new AspNetUsers();
+    IEnumerable<DRoles> GetAllRoles { get; set; }
+    IEnumerable<AspNetUsers> GetAllUsers { get; set; }
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnClose { get; set; }
+    [Parameter]
+    public string CapaId { get; set; }
+    public string RoleId { get; set; }
+    public int IdCapa { get; set; }
+    public string IdUser { get; set; }
+    public string Message { get; set; }
+    public string Alert { get; set; } = "default";
+    private Task ModalCancel()
+    {
+        return OnClose.InvokeAsync(false);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        GetAllRoles = await AllRoles();
+        GetAllUsers = await GetAllUsersM();
+        //IdProcess = Convert.ToInt32(ProcessId);
+        processAssRoles = await GetProcessRoles();
+    }
+    private Task ModalOk()
+    {
+        return OnClose.InvokeAsync(true);
+    }
+    private async Task<List<DRoles>> AllRoles()
+    {
+        return await db.DRoles.ToListAsync();
+    }
+    private async Task<List<AspNetUsers>> GetAllUsersM()
+    {
+        return await db.AspNetUsers.ToListAsync();
+    }
+    private async Task<List<DCapaExtraMembers>> GetProcessRoles()
+    {
+        int id = string.IsNullOrEmpty(CapaId) ? 0 : Convert.ToInt32(CapaId);
+        var members = await db.DCapaExtraMembers.Where(x => x.IdCapa == id).ToListAsync();
+        return members;
+    }
+    public async Task SaveGeneralInformation()
+    {
+        int roleId = Convert.ToInt32(RoleId);
+        int idCapa = Convert.ToInt32(CapaId);
+
+        try
+        {
+            if (idCapa == 0 || roleId == 0 || string.IsNullOrEmpty(IdUser))
+            {
+                var exists = await db.DCapaExtraMembers.FirstOrDefaultAsync(x => x.IdRole == processRoles.IdRole && x.IdUser == processRoles.IdUser && processRoles.IdUser == CapaId);
+                processRoles.IdRole = roleId;
+                processRoles.IdCapa = idCapa;                             
+
+                if (exists == null)
+                {
+                    db.DCapaExtraMembers.Add(processRoles);
+                }
+                else
+                {
+                    await js.InvokeAsync<Task>("alert", "User is already in this CAPA!");
+                    processRoles = new DCapaExtraMembers();
+                    Message = "Team member is already in this CAPA!";
+                    Alert = "danger";
+                    return;
+                }
+            }
+            else
+            {
+                await js.InvokeAsync<Task>("alert", "Select a Team Member to add to this CAPA!");
+                processRoles = new DCapaExtraMembers();
+                Message = "Select a team member first!";
+                Alert = "danger";
+                return;
+            }
+            await db.SaveChangesAsync();
+            GetAllRoles = await AllRoles();
+            processAssRoles = await GetProcessRoles();
+            processRoles = new DCapaExtraMembers();
+            Message = "Team Member Added!";
+            Alert = "success";
+            //ModalOk();
+        }
+        catch (Exception ex)
+        {
+            ex.InnerException.ToString();
+            ex.Message.ToString();
+        }
+    }
+    protected async Task MarkAsDeleted(int id)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (confirmed)
+        {
+            var processRoles = await db.DCapaExtraMembers.FirstOrDefaultAsync(x => x.IdCapaMember == id);
+            db.DCapaExtraMembers.Remove(processRoles);
+            await db.SaveChangesAsync();
+            processAssRoles = await GetProcessRoles();
+            Message = "Team Member Deleted";
+            Alert = "danger";
+        }
+    }
+}

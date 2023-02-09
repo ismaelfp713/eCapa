@@ -59,7 +59,6 @@
                                         </tr>
                                 </thead>
                                 <tbody>
-
                                     @foreach (var a in getPictures)
                                     {
                                     <tr>
@@ -104,6 +103,8 @@
     Dtwo d2 = new Dtwo();
     DtwoPictures pics = new DtwoPictures();
     List<DtwoPictures> getPictures = new List<DtwoPictures>();
+   
+
     [Parameter]
     public string IdCar { get; set; }
     private int idtopass { get; set; }
@@ -192,6 +193,7 @@
 
         }
     }
+    
     protected override async Task OnInitializedAsync()
     {
         CarIdNumber = Convert.ToInt32(IdCar);
